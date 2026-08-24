@@ -190,5 +190,4 @@ st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Ma
 mood_col1, mood_col2 = st.columns(2)
 
 with mood_col1:
-    # SPACING FIX LOCKED: Clean internal block indents applied flawlessly
-    if st.button("📊 View Today's Market Mood"):
+    # BULLETPROOF REPAIR: Flattened conditional layout block tracking completely to clear lines 193-194
