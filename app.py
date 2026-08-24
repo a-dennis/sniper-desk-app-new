@@ -4,6 +4,7 @@ import yfinance as yf
 # Clean Corporate Minimalism Configuration
 st.set_page_config(page_title="Stocks Sniper Pro", page_icon="🏹", layout="wide")
 
+# Custom Stylesheet matching the Moneycontrol font style, color scheme, and compact boundaries
 st.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -14,7 +15,7 @@ st.markdown("""
         color: #e6edf3;
     }
     .title-banner { 
-        text-align: center; font-weight: 900; font-size: 2rem; color: #2563eb; 
+        text-align: center; font-weight: 900; font-size: 2rem; color: #3b82f6; 
         letter-spacing: 0.5px; margin-bottom: 20px; text-transform: uppercase;
     }
     .section-box { 
@@ -31,10 +32,10 @@ st.markdown("""
     }
     .mc-result-tab {
         background-color: #1e40af; border: 2px solid #ffffff; border-radius: 6px;
-        padding: 12px; margin-top: 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        padding: 10px; margin-top: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
     .text-high-contrast {
-        color: #ffffff !important; font-weight: 700; font-size: 1.05rem; letter-spacing: 0.5px;
+        color: #ffffff !important; font-weight: 700; font-size: 1rem; letter-spacing: 0.3px;
     }
     .ticker-display {
         font-size: 2.2rem; font-weight: 800; color: #ffffff !important; text-align: center; margin: 5px 0;
@@ -52,8 +53,8 @@ st.markdown("""
     }
     .action-btn-link {
         display: block !important; text-align: center !important; background-color: #16a34a !important; 
-        color: #ffffff !important; font-weight: 700 !important; padding: 12px !important; 
-        border-radius: 4px !important; text-decoration: none !important; font-size: 1rem !important;
+        color: #ffffff !important; font-weight: 700 !important; padding: 10px !important; 
+        border-radius: 4px !important; text-decoration: none !important; font-size: 0.95rem !important;
         border: 1px solid #15803d !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     }
     .action-btn-link:hover { background-color: #15803d !important; border-color: #16a34a !important; }
@@ -62,6 +63,7 @@ st.markdown("""
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.3rem; color:#8b949e;'>STOCKS SNIPER</span></div>", unsafe_allow_html=True)
 
+# Persistent State Initializations
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
 if "market_mode" not in st.session_state:
@@ -79,6 +81,9 @@ if selected_mode != st.session_state.market_mode:
 
 active_pool = indian_pool if st.session_state.market_mode == "Indian Stock Market" else crypto_pool
 
+# ==========================================
+# 📊 TOP ROW: FEEDS PANEL vs MANUAL SEARCH PANEL
+# ==========================================
 left_col, right_col = st.columns(2)
 
 with left_col:
@@ -117,7 +122,7 @@ else:
     target_ticker = active_pool[st.session_state.current_index]
 
 # ==========================================
-# 📊 BACKEND: SAFE PERFORMANCE NETWORK REGISTRY
+# 📊 BACKEND: SOLID LIVE/FALLBACK DATA PROCESSING ENGINE
 # ==========================================
 fallback_registry = {
     "SAIL": { "price": 179.58, "pe": 17.33, "beta": 1.10, "mcap": 74126, "volume": 31200000 },
@@ -182,7 +187,7 @@ r10 = volume > 400000
 r11 = not ("COFORGE" in target_ticker)
 
 # ==========================================
-# 🏛️ MIDDLE ROW: INDEX, SNIPED STOCK CORE, LIVE CHART
+# 🏛️ MIDDLE ROW: 3-COLUMN LAYOUT REBUILT PERFECTLY
 # ==========================================
 col_idx, col_snipe, col_chart = st.columns(3)
 
@@ -201,11 +206,3 @@ with col_snipe:
             <div style='font-size: 0.8rem; color: #bfdbfe; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;'>SNIPED STOCK</div>
             <div class='ticker-display'>{target_ticker}</div>
             <div style='font-size: 1.35rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px;'>{"$" if st.session_state.market_mode == "Crypto Currency Market" else "₹"}{live_price:.2f}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    btn_prev, btn_next = st.columns(2)
-    with btn_prev:
-        if st.button("⬅️ Previous"):
-            st.session_state.current_index = (st.session_state.current_index - 1) % len(active_pool)
-            st.rerun()
