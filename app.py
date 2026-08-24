@@ -117,9 +117,8 @@ else:
     target_ticker = active_pool[st.session_state.current_index]
 
 # ==========================================
-# 📊 BACKEND: SAFE NETWORK NETWORK ENGINE
+# 📊 BACKEND: SAFE PERFORMANCE NETWORK REGISTRY
 # ==========================================
-# Fixed structural fallback data sheet dictionary to insulate system against live server connection drops
 fallback_registry = {
     "SAIL": { "price": 179.58, "pe": 17.33, "beta": 1.10, "mcap": 74126, "volume": 31200000 },
     "FEDERALBNK": { "price": 359.85, "pe": 19.23, "beta": 1.09, "mcap": 89000, "volume": 1200000 },
@@ -144,7 +143,6 @@ try:
     yf_engine = yf.Ticker(formatted_symbol)
     data_frame = yf_engine.history(period="3d")
     
-    # SAFET NET LOOP: If yfinance has an empty return or lags out, instantly pull clean data from fallback registry
     if not data_frame.empty and len(data_frame) > 0:
         live_price = data_frame['Close'].iloc[-1]
         volume = data_frame['Volume'].iloc[-1]
@@ -165,13 +163,11 @@ except:
         beta = fallback_registry[target_ticker]["beta"]
         mcap = fallback_registry[target_ticker]["mcap"]
 
-# Overwrite high-risk targets explicitly so the engine checks their values dynamically
 if "COFORGE" in target_ticker:
     pe = 38.4; beta = 1.45; mcap = 42000; live_price = 1874.60
 elif "WIPRO" in target_ticker:
     pe = 14.38; beta = 0.39; mcap = 94000
 
-# Strategy Rule Calculations
 r1 = 50 <= live_price <= 500 if st.session_state.market_mode == "Indian Stock Market" else True
 r2 = pe <= 25 or target_ticker in ["WIPRO", "COFORGE"]
 r3 = 0.60 <= beta <= 1.20 if st.session_state.market_mode == "Indian Stock Market" else True
@@ -204,3 +200,12 @@ with col_snipe:
         <div class='suggestion-box'>
             <div style='font-size: 0.8rem; color: #bfdbfe; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;'>SNIPED STOCK</div>
             <div class='ticker-display'>{target_ticker}</div>
+            <div style='font-size: 1.35rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px;'>{"$" if st.session_state.market_mode == "Crypto Currency Market" else "₹"}{live_price:.2f}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    btn_prev, btn_next = st.columns(2)
+    with btn_prev:
+        if st.button("⬅️ Previous"):
+            st.session_state.current_index = (st.session_state.current_index - 1) % len(active_pool)
+            st.rerun()
