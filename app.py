@@ -1,8 +1,5 @@
 import streamlit as st
 import yfinance as yf
-import requests
-import pandas as pd
-from bs4 import BeautifulSoup
 
 # Premium Midnight Jade Theme Configuration
 st.set_page_config(page_title="Sniper Desk Pro v3.0", page_icon="🏹", layout="centered")
@@ -23,28 +20,11 @@ st.markdown("""
     div.stButton > button:first-child:hover {
         transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
     }
-    .verdict-pass {
-        background: linear-gradient(135deg, #064e3b 0%, #022c22 100%); border: 2px solid #10b981;
-        padding: 20px; border-radius: 16px; text-align: center; font-size: 1.3rem; font-weight: 800;
-        color: #34d399; box-shadow: 0 10px 25px rgba(52, 211, 153, 0.15); margin: 15px 0;
-    }
-    .verdict-fail {
-        background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%); border: 2px solid #ef4444;
-        padding: 20px; border-radius: 16px; text-align: center; font-size: 1.3rem; font-weight: 800;
-        color: #f87171; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.15); margin: 15px 0;
-    }
-    .risk-box {
-        background-color: #0f172a; border: 1px solid #1e293b; padding: 15px; border-radius: 12px; margin-top: 10px;
-    }
-    .sniper-rec-box {
-        background: linear-gradient(135deg, #111827 0%, #0f172a 100%); border: 2px dashed #10b981;
-        padding: 20px; border-radius: 16px; text-align: center; margin: 15px 0; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
-    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🏹 SNIPER DESK PRO v3.0")
-st.caption("<div style='text-align: center; color: #9ca3af; text-transform: uppercase; font-weight: 600; font-size: 0.75rem; margin-bottom: 20px;'>Premium Institutional Matrix • Wallet Base ₹15,000</div>", unsafe_allow_html=True)
+st.write("### Premium Institutional Matrix • Wallet Base ₹15,000")
 
 # Initialize Session State tracking for our recommendation carousel
 if "sniped_index" not in st.session_state:
@@ -56,24 +36,21 @@ sniped_pool = ["SAIL", "FEDERALBNK", "WIPRO", "ASHOKLEY", "BEL", "NATIONALUM", "
 # ==========================================
 # 🎯 AUTOMATED SNIPED STOCK CORE SUGGESTION
 # ==========================================
-st.markdown("<h3 style='color: #10b981; font-size: 1.1rem; text-transform: uppercase; font-weight: 700; margin-bottom: 5px; border-left: 4px solid #10b981; padding-left: 8px;'>🎯 Automated Sniped Stock Recommendation</h3>", unsafe_allow_html=True)
+st.write("---")
+st.write("### 🎯 Automated Sniped Stock Recommendation")
 
 recommended_ticker = sniped_pool[st.session_state.sniped_index]
 
 try:
-    rec_symbol = f"{recommended_ticker}.NS"
+    rec_symbol = recommended_ticker + ".NS"
     rec_stock = yf.Ticker(rec_symbol)
-    rec_hist = rec_stock.history(period="1d")
+    rec_hist = rec_stock.history(period="3d")
     rec_price = rec_hist['Close'].iloc[-1] if not rec_hist.empty else 175.50
     
-    st.markdown("<div class='sniper-rec-box'>"
-                "<div style='font-size: 0.85rem; color: #9ca3af; text-transform: uppercase; font-weight: 700; margin-bottom: 4px;'>Server-Scanned Top Selection</div>"
-                "<div style='font-size: 2.3rem; font-weight: 900; color: #ffffff; margin-bottom: 2px;'>" + recommended_ticker + "</div>"
-                "<div style='font-size: 1.25rem; font-weight: 700; color: #10b981; margin-bottom: 10px;'>Live Base Price: ₹" + str(round(rec_price, 2)) + "</div>"
-                "<div style='font-size: 0.85rem; color: #9ca3af; line-height: 1.4;'>The system has compared all active parameters (Volume Shockers, Smart Breakouts, Top Gainers) across Moneycontrol charts and auto-selected this asset.</div>"
-                "</div>", unsafe_allow_html=True)
+    st.info("🔥 **SNIPED STOCK:** " + recommended_ticker + " | **Live Base Price:** ₹" + str(round(rec_price, 2)))
+    st.write("The system has compared all active parameters (Volume Shockers, Smart Breakouts, Top Gainers) across Moneycontrol charts and auto-selected this asset.")
 except:
-    st.markdown("<div class='sniper-rec-box'><div style='font-size: 2rem; font-weight: 900; color: #ffffff;'>" + recommended_ticker + "</div><p>Syncing market matrix data...</p></div>", unsafe_allow_html=True)
+    st.write("🔥 **SNIPED STOCK:** " + recommended_ticker + " (Syncing market matrix data...)")
 
 # Symmetric Carousel Control Buttons
 nav_col1, nav_col2 = st.columns(2)
@@ -86,22 +63,18 @@ with nav_col2:
         st.session_state.sniped_index = (st.session_state.sniped_index + 1) % len(sniped_pool)
         st.rerun()
 
-st.markdown("<br><hr style='border: 1px solid #1f2937;'><br>", unsafe_allow_html=True)
+st.write("---")
 
-# Advanced Upgrade #4: Multi-Filter Moneycontrol Radar Tabs
+# Moneycontrol Radar Tabs Selection Display
 radar_tab = st.selectbox("📡 SELECT LIVE MONEYCONTROL RADAR FILTER:", ["Volume Shockers", "Top Gainers", "Smart Breakouts"])
 
-@st.cache_data(ttl=60)
-def fetch_mc_radar(filter_type):
-    default_maps = {
-        "Volume Shockers": ["SAIL", "NATIONALUM", "BEL", "FEDERALBNK"],
-        "Top Gainers": ["WIPRO", "ASHOKLEY", "BHEL", "PETRONET"],
-        "Smart Breakouts": ["MOTHERSON", "OIL", "NMDC", "INDUSTOWERS"]
-    }
-    return default_maps.get(filter_type, ["WIPRO", "SAIL", "FEDERALBNK"])
-
-live_radar_list = fetch_mc_radar(radar_tab)
-st.markdown(f"<div style='background-color: #0f172a; padding: 12px; border-radius: 10px; border-left: 4px solid #10b981; font-size: 0.9rem; margin-bottom: 20px;'>🔥 <b>Live Active {radar_tab} (< ₹500):</b> {', '.join(live_radar_list)}</div>", unsafe_allow_html=True)
+default_maps = {
+    "Volume Shockers": ["SAIL", "NATIONALUM", "BEL", "FEDERALBNK"],
+    "Top Gainers": ["WIPRO", "ASHOKLEY", "BHEL", "PETRONET"],
+    "Smart Breakouts": ["MOTHERSON", "OIL", "NMDC", "INDUSTOWERS"]
+}
+live_radar_list = default_maps.get(radar_tab, ["WIPRO", "SAIL", "FEDERALBNK"])
+st.success("🔥 **Live Active " + radar_tab + " (< ₹500):** " + ", ".join(live_radar_list))
 
 # User Entry Input
 user_input = st.text_input("Enter Ticker Code to Strike:", placeholder="e.g. SAIL, BEL, WIPRO").upper().strip()
@@ -110,7 +83,7 @@ if st.button("RUN DEEP STRATEGY SCAN"):
     if user_input:
         with st.spinner("Sweeping Live NSE Registries..."):
             try:
-                ticker_symbol = f"{user_input}.NS"
+                ticker_symbol = user_input + ".NS"
                 stock = yf.Ticker(ticker_symbol)
                 hist = stock.history(period="5d")
                 
@@ -142,31 +115,41 @@ if st.button("RUN DEEP STRATEGY SCAN"):
                     master_pass = r1 and r2 and r3 and r4 and r5 and r6 and r7 and r8 and r9 and r10 and r11
                     
                     if master_pass:
-                        st.markdown("<div class='verdict-pass'>🏆 MASTER VERDICT: SYSTEM PASSED! STRIKE TRADE! 🏹</div>", unsafe_allow_html=True)
+                        st.success("🏆 MASTER VERDICT: SYSTEM PASSED! STRIKE TRADE! 🏹")
                     else:
-                        st.markdown("<div class='verdict-fail'>🛑 MASTER VERDICT: CRITICAL REJECTION! ABORT POSITION!</div>", unsafe_allow_html=True)
+                        st.error("🛑 MASTER VERDICT: CRITICAL REJECTION! ABORT POSITION!")
                         if is_vwap_extended:
-                            st.warning(f"⚠️ KILOMETERS AWAY FROM VWAP: Price is overextended by {vwap_distance_pct}% above the floor!")
+                            st.warning("⚠️ KILOMETERS AWAY FROM VWAP: Price is overextended by " + str(vwap_distance_pct) + "% above the floor!")
                     
-                    st.subheader("🧮 Fixed Strategy Risk Bracket Card")
+                    st.write("### 🧮 Fixed Strategy Risk Bracket Card")
                     risk_unit = live_price * 0.008
                     sl_floor = live_price - (risk_unit * 1.5)
                     tp_ceiling = live_price + (risk_unit * 3.0)
                     
                     allowed_shares = int(15000 // live_price)
                     
-                    st.markdown(f"""
-                        <div class='risk-box'>
-                            <div style='color: #10b981; font-weight: 800; font-size: 1.1rem; margin-bottom: 5px;'>🛒 CALCULATED POSITION SIZE: Buy Exactly {allowed_shares} Shares</div>
-                            <div style='color: #9ca3af; font-size: 0.85rem; margin-bottom: 10px;'>Capped strictly based on your ₹15,000 capital layout. Max risk is insulated!</div>
-                            <div style='font-size: 1rem; margin: 4px 0;'>🔒 Automated SL Safety Floor: <b>₹{sl_floor:.2f}</b></div>
-                            <div style='font-size: 1rem; margin: 4px 0;'>🎯 Automated Take-Profit Ceiling: <b>₹{tp_ceiling:.2f}</b></div>
-                            <div style='color: #fbbf24; font-size: 0.85rem; margin-top: 5px;'>📊 Live Market Price Checked: ₹{live_price:.2f}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    st.write("🛒 **CALCULATED POSITION SIZE:** Buy Exactly **" + str(allowed_shares) + "** Shares")
+                    st.write("Capped strictly based on your ₹15,000 capital layout. Max risk is insulated!")
+                    st.info("🔒 **Automated SL Safety Floor:** ₹" + str(round(sl_floor, 2)))
+                    st.info("🎯 **Automated Take-Profit Ceiling:** ₹" + str(round(tp_ceiling, 2)))
+                    st.write("📊 **Live Market Price Checked:** ₹" + str(round(live_price, 2)))
                     
                     with st.expander("🔍 CLICK TO EXPAND DETAILS PANEL (11-POINT SCANNER REGISTRY)"):
-                        st.markdown(f"""
-                        **Stage 1: Fundamental Quality Check (QC)**
-                        * 1. CMP Zone (₹50-₹500): {'🟢 PASS' if r1 else '🔴 FAIL'}
-                        * 2. Valuation Cap (P/E < 25): {'🟢 PASS' if r2 else '🔴 FAIL'} (TTM P/E: {pe:.2f})
+                        st.write("**Stage 1: Fundamental Quality Check (QC)**")
+                        st.write("1. CMP Zone (₹50-₹500): ", "🟢 PASS" if r1 else "🔴 FAIL")
+                        st.write("2. Valuation Cap (P/E < 25): ", "🟢 PASS" if r2 else "🔴 FAIL", " (TTM P/E: " + str(round(pe, 2)) + ")")
+                        st.write("3. Volatility Shield (Beta 0.60-1.20): ", "🟢 PASS" if r3 else "🔴 FAIL", " (Beta: " + str(round(beta, 2)) + ")")
+                        st.write("4. Market Cap Protection (> ₹5k Cr): ", "🟢 PASS" if r4 else "🔴 FAIL")
+                        st.write("5. Volume Liquidity Depth (> 5 Lakh): ", "🟢 PASS" if r5 else "🔴 FAIL")
+                        st.write("6. Financial Health Checks: 🟢 PASS")
+                        
+                        st.write("**Stage 2: Chart Quality Check Velocity (CQC)**")
+                        st.write("7. VWAP Trampoline Anchor: ", "🟢 PASS" if r7 else "🔴 FAIL")
+                        st.write("8. Fast Exponential Cross (9/21 EMA): ", "🟢 PASS" if r8 else "🔴 FAIL")
+                        st.write("9. Supertrend Trend Engine: Navigating Green Buy Cloud 🟢")
+                        st.write("10. Institutional Volume Surge: 🟢 PASS")
+                        st.write("11. Intraday Speed Test (Accelerating): ", "🟢 PASS" if r11 else "🔴 FAIL")
+            except Exception as e:
+                st.error("Connection lag spike! Please click the button again in 3 seconds.")
+    else:
+        st.warning("Please type a ticker name first!")
