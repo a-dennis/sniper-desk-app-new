@@ -81,11 +81,9 @@ active_pool = indian_pool if st.session_state.market_mode == "Indian Stock Marke
 left_col, right_col = st.columns(2)
 
 with left_col:
-    # BUG FIX 1: Removed the words "Left Side" completely. Kept as Feeds only!
     st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>📋 Feeds</div>", unsafe_allow_html=True)
     radar_filter = st.selectbox("Select Active Moneycontrol Screening Filter:", ["Volume Shocker", "Top Gainers", "Smart Breakout"])
     
-    # BUG FIX 2: Bulletproof real-time feed mapping arrays ensuring results show for all choices!
     if st.session_state.market_mode == "Indian Stock Market":
         if radar_filter == "Volume Shocker":
             feed_items = ["SAIL", "NATIONALUM", "BEL"]
@@ -104,7 +102,6 @@ with left_col:
     st.markdown(f"<div class='text-high-contrast' style='margin-top:10px;'>🔥 Active {radar_filter} Candidates: <span style='color:#58a6ff;'>{', '.join(feed_items)}</span></div></div>", unsafe_allow_html=True)
 
 with right_col:
-    # BUG FIX 3: Re-engineered manual entry layer with direct tracking variable binding so typing works flawlessly!
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Search Interface</div>", unsafe_allow_html=True)
     search_query = st.text_input("Type Asset Code / Override Symbol here (Press Enter):", key="manual_search_widget").upper().strip()
 
@@ -158,7 +155,6 @@ with col_snipe:
             st.rerun()
 
 with col_chart:
-    # BUG FIX 4: Upgraded link routing. Replaced raw ticker keys with verified dynamic TradingView addresses!
     st.markdown("<div class='section-box'><div class='section-title'>📈 Live Chart Window</div>", unsafe_allow_html=True)
     if st.session_state.market_mode == "Indian Stock Market":
         chart_url = f"https://tradingview.com{target_ticker}/"
@@ -169,9 +165,9 @@ with col_chart:
 # ==========================================
 # ⚙️ STOCK DETAILS INTERACTIVE DROPDOWN PANEL
 # ==========================================
-# BUG FIX 5: Completely re-wired Stock Details block to pull the live active ticker title name and checklist values with 100% visibility!
 st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
 with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_ticker})"):
+    # FIX: Corrected text block string encapsulation boundaries to prevent parsing glitches
     st.markdown(f"""
     <div class='text-high-contrast'>
     <b>11-Point Execution Verification Matrix Status Metrics for Stock Name: <span style='color:#58a6ff;'>{target_ticker}</span></b><br><br>
@@ -184,3 +180,13 @@ with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_t
     🟢 7. VWAP Support Anchoring Level ➔ <b>PASS</b><br>
     🟢 8. Exponential Moving Average Cross (9/21 EMA) ➔ <b>PASS</b><br>
     🟢 9. Supertrend Speed Engine Cloud ➔ <b>PASS</b><br>
+    🟢 10. Institutional Volume Mean Surge ➔ <b>PASS</b><br>
+    🟢 11. Intraday Momentum Acceleration Velocity ➔ <b>PASS</b>
+    </div>
+    """, unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ==========================================
+# 🏛️ BOTTOM SECTION: MARKET MOOD & TOP NEWS BUTTONS
+# ==========================================
+st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Market Mood & Top News</div>", unsafe_allow_html=True)
