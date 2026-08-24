@@ -105,12 +105,7 @@ with left_col:
         else:
             feed_items = ["XRP-USD", "ADA-USD"]
         
-    st.markdown(f"""
-        <div class='mc-result-tab'>
-            <div class='text-high-contrast'>🔥 Active {radar_filter} Candidates: <span style='color:#60a5fa; text-decoration: underline;'>{', '.join(feed_items)}</span></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<div class='mc-result-tab'><div class='text-high-contrast'>🔥 Active " + radar_filter + " Candidates: <span style='color:#60a5fa; text-decoration: underline;'>" + ", ".join(feed_items) + "</span></div></div></div>", unsafe_allow_html=True)
 
 with right_col:
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Search Interface</div>", unsafe_allow_html=True)
@@ -122,7 +117,7 @@ else:
     target_ticker = active_pool[st.session_state.current_index]
 
 # ==========================================
-# 📊 BACKEND: SOLID LIVE/FALLBACK DATA PROCESSING ENGINE
+# 📊 BACKEND: SAFE PERFORMANCE NETWORK REGISTRY
 # ==========================================
 fallback_registry = {
     "SAIL": { "price": 179.58, "pe": 17.33, "beta": 1.10, "mcap": 74126, "volume": 31200000 },
@@ -144,7 +139,7 @@ mcap = 12000
 volume = 800000
 
 try:
-    formatted_symbol = target_ticker if (target_ticker.endswith(".NS") or st.session_state.market_mode == "Crypto Currency Market") else f"{target_ticker}.NS"
+    formatted_symbol = target_ticker if (target_ticker.endswith(".NS") or st.session_state.market_mode == "Crypto Currency Market") else target_ticker + ".NS"
     yf_engine = yf.Ticker(formatted_symbol)
     data_frame = yf_engine.history(period="3d")
     
@@ -192,18 +187,18 @@ r11 = not ("COFORGE" in target_ticker)
 col_idx, col_snipe, col_chart = st.columns(3)
 
 with col_idx:
-    st.markdown("<div class='section-box'><div class='section-title'>📊 Benchmark Index</div>", unsafe_allow_html=True)
-    if st.session_state.market_mode == "Indian Stock Market":
-        st.markdown("<div class='text-high-contrast'>🔹 Nifty Index Floor<br>🔹 Bank Nifty Desk</div></div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='text-high-contrast'>🔹 Bitcoin Dominance<br>🔹 Aggregate Market Cap Track</div></div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-box'><div class='section-title'>📊 Benchmark Index</div><div class='text-high-contrast'>🔹 Nifty Index Floor<br>🔹 Bank Nifty Desk</div></div>", unsafe_allow_html=True)
 
 with col_snipe:
     st.markdown("<div class='section-title' style='text-align: center; color:#ffffff !important;'>🎯 Your Ultimate Stock Suggestion</div>", unsafe_allow_html=True)
     
-    st.markdown(f"""
-        <div class='suggestion-box'>
-            <div style='font-size: 0.8rem; color: #bfdbfe; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;'>SNIPED STOCK</div>
-            <div class='ticker-display'>{target_ticker}</div>
-            <div style='font-size: 1.35rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px;'>{"$" if st.session_state.market_mode == "Crypto Currency Market" else "₹"}{live_price:.2f}</div>
-        </div>
+    st.markdown("<div class='suggestion-box'><div style='font-size: 0.8rem; color: #bfdbfe; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;'>SNIPED STOCK</div><div class='ticker-display'>" + target_ticker + "</div><div style='font-size: 1.35rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px;'>₹" + str(round(live_price, 2)) + "</div></div>", unsafe_allow_html=True)
+
+    btn_prev, btn_next = st.columns(2)
+    with btn_prev:
+        if st.button("⬅️ Previous"):
+            st.session_state.current_index = (st.session_state.current_index - 1) % len(active_pool)
+            st.rerun()
+    with btn_next:
+        if st.button("Next ➡️"):
+            st.session_state.current_index = (st.session_state.current_index + 1) % len(active_pool)
