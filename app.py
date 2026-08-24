@@ -187,7 +187,7 @@ r10 = volume > 400000
 r11 = not ("COFORGE" in target_ticker)
 
 # ==========================================
-# 🏛️ MIDDLE ROW: 3-COLUMN LAYOUT REBUILT PERFECTLY
+# 🏛️ MIDDLE ROW: 3-COLUMN LAYOUT
 # ==========================================
 col_idx, col_snipe, col_chart = st.columns(3)
 
@@ -196,7 +196,7 @@ with col_idx:
     if st.session_state.market_mode == "Indian Stock Market":
         st.markdown("<div class='text-high-contrast'>🔹 Nifty Index Floor<br>🔹 Bank Nifty Desk</div></div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div class='text-high-contrast'>🔹 Bitcoin Dominance<br>🔹 Aggregate Cap Track</div></div>", unsafe_allow_html=True)
+        st.markdown("<div class='text-high-contrast'>🔹 Bitcoin Dominance<br>🔹 Aggregate Market Cap Track</div></div>", unsafe_allow_html=True)
 
 with col_snipe:
     st.markdown("<div class='section-title' style='text-align: center; color:#ffffff !important;'>🎯 Your Ultimate Stock Suggestion</div>", unsafe_allow_html=True)
@@ -206,3 +206,4 @@ with col_snipe:
             <div style='font-size: 0.8rem; color: #bfdbfe; text-transform: uppercase; font-weight: 700; margin-bottom: 2px;'>SNIPED STOCK</div>
             <div class='ticker-display'>{target_ticker}</div>
             <div style='font-size: 1.35rem; font-weight: 700; color: #60a5fa; margin-bottom: 6px;'>{"$" if st.session_state.market_mode == "Crypto Currency Market" else "₹"}{live_price:.2f}</div>
+        </div>
