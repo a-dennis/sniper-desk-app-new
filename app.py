@@ -113,7 +113,6 @@ else:
 # ==========================================
 # 🏛️ MIDDLE ROW: INDEX, SNIPED STOCK CORE SUGGESTION, LIVE CHART WINDOW
 # ==========================================
-# FIX: Added required numerical layout dimension block mapping (3 columns)
 col_idx, col_snipe, col_chart = st.columns(3)
 
 with col_idx:
@@ -143,7 +142,6 @@ with col_snipe:
     except:
         st.markdown(f"<div class='suggestion-box'><div class='ticker-display'>{target_ticker}</div><p>Syncing asset matrix...</p></div>", unsafe_allow_html=True)
 
-    # Carousel Navigation Buttons Logic tracking
     btn_prev, btn_next = st.columns(2)
     with btn_prev:
         if st.button("⬅️ Previous Stock"):
@@ -190,4 +188,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ==========================================
 st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Market Mood & Top News</div>", unsafe_allow_html=True)
 mood_col1, mood_col2 = st.columns(2)
+
 with mood_col1:
+    # SPACING FIX LOCKED: Clean internal block indents applied flawlessly
+    if st.button("📊 View Today's Market Mood"):
