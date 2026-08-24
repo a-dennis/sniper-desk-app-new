@@ -4,7 +4,7 @@ import yfinance as yf
 # Clean Corporate Minimalism Configuration
 st.set_page_config(page_title="Stocks Sniper Pro", page_icon="🏹", layout="wide")
 
-# Custom Stylesheet matching the Moneycontrol font style, color scheme, and compact boundaries
+# Custom Stylesheet mirroring official Moneycontrol colors, typography, and tab contours
 st.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -15,30 +15,40 @@ st.markdown("""
         color: #e6edf3;
     }
     .title-banner { 
-        text-align: center; font-weight: 900; font-size: 2rem; color: #3b82f6; 
+        text-align: center; font-weight: 900; font-size: 2rem; color: #2563eb; 
         letter-spacing: 0.5px; margin-bottom: 20px; text-transform: uppercase;
     }
-    
-    /* MODIFIED: Compact Box Dimensions, Clean Contoured Alignment, and Moneycontrol Blue Fill */
     .section-box { 
         background-color: #1e3a8a; 
         border: 1px solid #3b82f6; 
         padding: 12px 18px; 
         border-radius: 6px; 
         margin-bottom: 12px; 
-        min-height: auto;
     }
-    
     .section-title { 
         font-size: 0.85rem; font-weight: 700; color: #93c5fd; 
         text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #3b82f6; padding-bottom: 4px;
         letter-spacing: 0.3px;
     }
-    .ticker-display {
-        font-size: 2.2rem; font-weight: 800; color: #ffffff !important; text-align: center; margin: 5px 0;
+    
+    /* MODIFIED: Premium Moneycontrol-Style High Contrast Results Tab Container */
+    .mc-result-tab {
+        background-color: #1e40af;
+        border: 2px solid #ffffff;
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
     .text-high-contrast {
-        color: #ffffff !important; font-weight: 600; font-size: 0.95rem;
+        color: #ffffff !important; 
+        font-weight: 700; 
+        font-size: 1.05rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .ticker-display {
+        font-size: 2.2rem; font-weight: 800; color: #ffffff !important; text-align: center; margin: 5px 0;
     }
     .suggestion-box {
         background: linear-gradient(135deg, #1e40af 0%, #172554 100%); border: 1px solid #60a5fa;
@@ -51,17 +61,30 @@ st.markdown("""
     div.stButton > button:hover {
         background-color: #334155; border-color: #60a5fa; color: #60a5fa !important;
     }
+    
+    /* RE-CONFIGURED: Ultra-Reliable Interactive Button Styling */
     .action-btn-link {
-        display: block; text-align: center; background-color: #16a34a; color: #ffffff !important;
-        font-weight: 700; padding: 10px; border-radius: 4px; text-decoration: none; font-size: 0.95rem;
+        display: block !important; 
+        text-align: center !important; 
+        background-color: #16a34a !important; 
+        color: #ffffff !important;
+        font-weight: 700 !important; 
+        padding: 12px !important; 
+        border-radius: 4px !important; 
+        text-decoration: none !important; 
+        font-size: 1rem !important;
+        border: 1px solid #15803d !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     }
-    .action-btn-link:hover { background-color: #15803d; }
+    .action-btn-link:hover { 
+        background-color: #15803d !important; 
+        border-color: #16a34a !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.3rem; color:#8b949e;'>STOCKS SNIPER</span></div>", unsafe_allow_html=True)
 
-# Persistent State Initializations
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
 if "market_mode" not in st.session_state:
@@ -103,7 +126,13 @@ with left_col:
         else:
             feed_items = ["XRP-USD", "ADA-USD"]
         
-    st.markdown(f"<div class='text-high-contrast' style='margin-top:6px;'>🔥 Active Candidates: <span style='color:#93c5fd;'>{', '.join(feed_items)}</span></div></div>", unsafe_allow_html=True)
+    # MODIFIED: Styled inside the newly contoured high-contrast Moneycontrol-Style Result Tab
+    st.markdown(f"""
+        <div class='mc-result-tab'>
+            <div class='text-high-contrast'>🔥 Active {radar_filter} Candidates: <span style='color:#60a5fa; text-decoration: underline;'>{', '.join(feed_items)}</span></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with right_col:
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Search Interface</div>", unsafe_allow_html=True)
@@ -156,19 +185,20 @@ with col_snipe:
             st.rerun()
 
 with col_chart:
+    # BULLETPROOF RE-WIRING: Direct URL formatting strings mapped to open TV in a clean blank anchor window tab
     st.markdown("<div class='section-box'><div class='section-title'>📈 Live Chart Window</div>", unsafe_allow_html=True)
     if st.session_state.market_mode == "Indian Stock Market":
         chart_url = f"https://tradingview.com{target_ticker}/"
     else:
         chart_url = f"https://tradingview.com{target_ticker.replace('-', '')}/"
-    st.markdown(f"<a href='{chart_url}' target='_blank' class='action-btn-link'>📊 Open Live Chart ({target_ticker})</a></div>", unsafe_allow_html=True)
+        
+    st.markdown(f'<a href="{chart_url}" target="_blank" class="action-btn-link">📊 Open Live Chart ({target_ticker})</a></div>', unsafe_allow_html=True)
 
 # ==========================================
-# ⚙️ FIXED DROPDOWN ROW SHOWING CHECKLIST VALUES PERTINENT TO ACTIVE TICKER
+# ⚙️ FIXED DROPDOWN ROW: 11 PARAMETERS
 # ==========================================
 st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
 with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_ticker})"):
-    # RE-WIRED FIX: Live markdown format structure loads parameter outputs reliably now
     st.write(f"### 🎯 Strategy Checklist Verdict for Asset: {target_ticker}")
     st.markdown(f"""
     * 🟢 1. CMP Allocation Range Layer ➔ **PASS**
@@ -186,16 +216,3 @@ with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_t
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# 🏛️ BOTTOM SECTION: sentiment logs
-# ==========================================
-st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Market Mood & Top News</div>", unsafe_allow_html=True)
-mood_col1, mood_col2 = st.columns(2)
-
-with mood_col1:
-    if st.button("📊 View Today's Market Mood"):
-        st.info("🎰 Market Sentiment: Strong volume accumulation detected across metal, infrastructure, and core asset indexes.")
-
-with mood_col2:
-    st.markdown(f"<a href='https://moneycontrol.com' target='_blank' class='action-btn-link' style='background-color:#21262d; border: 1px solid #30363d;'>📰 Open Top News Sentiment Link</a>", unsafe_allow_html=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
