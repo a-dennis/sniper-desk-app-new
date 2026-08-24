@@ -1,7 +1,6 @@
 import streamlit as st
 import yfinance as yf
 
-# Premium Typography & Decent Color Palettes matching user hand-drawn UI sketch
 st.set_page_config(page_title="Stocks Sniper Pro", page_icon="🏹", layout="wide")
 
 st.markdown("""
@@ -52,19 +51,14 @@ st.markdown("""
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.5rem; color:#8b949e;'>STOCKS SNIPER</span></div>", unsafe_allow_html=True)
 
-# ==========================================
-# 🧠 PERSISTENT STATE LOGIC SECURE ARCHITECTURE
-# ==========================================
 if "current_index" not in st.session_state:
     st.session_state.current_index = 0
 if "market_mode" not in st.session_state:
     st.session_state.market_mode = "Indian Stock Market"
 
-# Global Core Asset Pools
 indian_pool = ["SAIL", "FEDERALBNK", "WIPRO", "ASHOKLEY", "BEL", "NATIONALUM", "MOTHERSON"]
 crypto_pool = ["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD"]
 
-# Global Asset Mode Toggles
 st.markdown("<div class='section-title'>🌐 Global Workspace Selector</div>", unsafe_allow_html=True)
 selected_mode = st.radio("Toggle Asset Desks:", ["Indian Stock Market", "Crypto Currency Market"], horizontal=True)
 
@@ -74,9 +68,6 @@ if selected_mode != st.session_state.market_mode:
 
 active_pool = indian_pool if st.session_state.market_mode == "Indian Stock Market" else crypto_pool
 
-# ==========================================
-# 📊 TOP ROW: FEEDS PANEL vs MANUAL SEARCH PANEL
-# ==========================================
 left_col, right_col = st.columns(2)
 
 with left_col:
@@ -104,15 +95,11 @@ with right_col:
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Search Interface</div>", unsafe_allow_html=True)
     search_query = st.text_input("Type Asset Code / Override Symbol here (Press Enter):", key="manual_search_widget").upper().strip()
 
-# Establish active working ticker reference
 if search_query:
     target_ticker = search_query
 else:
     target_ticker = active_pool[st.session_state.current_index]
 
-# ==========================================
-# 🏛️ MIDDLE ROW: INDEX, SNIPED STOCK CORE SUGGESTION, LIVE CHART WINDOW
-# ==========================================
 col_idx, col_snipe, col_chart = st.columns(3)
 
 with col_idx:
@@ -160,10 +147,7 @@ with col_chart:
         chart_url = f"https://tradingview.com{target_ticker.replace('-', '')}/"
     st.markdown(f"<a href='{chart_url}' target='_blank' class='action-btn-link'>📊 Live Chart ({target_ticker})</a></div>", unsafe_allow_html=True)
 
-# ==========================================
-# ⚙️ STOCK DETAILS INTERACTIVE DROPDOWN PANEL
-# ==========================================
-st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
+st.markdown("<div class='section-box'><div class='section-title'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
 with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_ticker})"):
     st.markdown(f"""
     <div class='text-high-contrast'>
@@ -183,11 +167,14 @@ with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_t
     """, unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# ==========================================
-# 🏛️ BOTTOM SECTION: MARKET MOOD & TOP NEWS BUTTONS
-# ==========================================
 st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Market Mood & Top News</div>", unsafe_allow_html=True)
 mood_col1, mood_col2 = st.columns(2)
 
 with mood_col1:
-    # BULLETPROOF REPAIR: Flattened conditional layout block tracking completely to clear lines 193-194
+    if st.button("📊 View Today's Market Mood"):
+        st.info("🎰 Market Mood Index: High institutional volume accumulation active across mining, metal, and infrastructure desks.")
+
+with mood_col2:
+    st.markdown(f"<a href='https://moneycontrol.com' target='_blank' class='action-btn-link' style='background-color:#21262d; border: 1px solid #30363d;'>📰 Open Top News Sentiment Link</a>", unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
