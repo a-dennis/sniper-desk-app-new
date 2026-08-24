@@ -71,7 +71,6 @@ selected_mode = st.radio("Toggle Asset Desks:", ["Indian Stock Market", "Crypto 
 if selected_mode != st.session_state.market_mode:
     st.session_state.market_mode = selected_mode
     st.session_state.current_index = 0
-    st.session_state.manual_input_value = ""
 
 active_pool = indian_pool if st.session_state.market_mode == "Indian Stock Market" else crypto_pool
 
@@ -114,7 +113,8 @@ else:
 # ==========================================
 # 🏛️ MIDDLE ROW: INDEX, SNIPED STOCK CORE SUGGESTION, LIVE CHART WINDOW
 # ==========================================
-col_idx, col_snipe, col_chart = st.columns()
+# FIX: Added required numerical layout dimension block mapping (3 columns)
+col_idx, col_snipe, col_chart = st.columns(3)
 
 with col_idx:
     st.markdown("<div class='section-box'><div class='section-title'>📊 Benchmark Index</div>", unsafe_allow_html=True)
@@ -167,13 +167,12 @@ with col_chart:
 # ==========================================
 st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
 with st.expander(f"👁️ Click for Parameters Details Checklist Map ({target_ticker})"):
-    # FIX: Corrected text block string encapsulation boundaries to prevent parsing glitches
     st.markdown(f"""
     <div class='text-high-contrast'>
     <b>11-Point Execution Verification Matrix Status Metrics for Stock Name: <span style='color:#58a6ff;'>{target_ticker}</span></b><br><br>
     🟢 1. CMP Allocation Range Layer ➔ <b>PASS</b><br>
     🟢 2. Valuation Cap Threshold (P/E) ➔ <b>PASS</b><br>
-    🟢 3. Volatility Elasticity Beta Shield ➔ <b>PASS</b><br>
+    🟢 3. Volatility Shield (Beta 0.60-1.20) ➔ <b>PASS</b><br>
     🟢 4. Market Capitalization Safety Cushion ➔ <b>PASS</b><br>
     🟢 5. Volume Liquidity Depth ➔ <b>PASS</b><br>
     🟢 6. Financial Health Leverage Checking ➔ <b>PASS</b><br>
@@ -190,3 +189,5 @@ st.markdown("</div>", unsafe_allow_html=True)
 # 🏛️ BOTTOM SECTION: MARKET MOOD & TOP NEWS BUTTONS
 # ==========================================
 st.markdown("<div class='section-box'><div class='section-title'>🎭 Today's Market Mood & Top News</div>", unsafe_allow_html=True)
+mood_col1, mood_col2 = st.columns(2)
+with mood_col1:
