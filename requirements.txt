@@ -1,1 +1,6 @@
 yfinance
+yfinance
+streamlit
+beautifulsoup4
+requests
+pandas
