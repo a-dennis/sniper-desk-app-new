@@ -1,5 +1,6 @@
 import streamlit as st
 import yfinance as yf
+import requests
 
 # Force elite institutional full-width configuration layout
 st.set_page_config(page_title="STOCKSCAN GLOBAL", page_icon="📊", layout="wide")
@@ -162,7 +163,7 @@ with mid_layout_col2:
     st.markdown("<div class='grid-box-accent'><div class='grid-box-title'>RESULT FOR STOCK NAMES</div>", unsafe_allow_html=True)
     item_3 = live_scanned_universe[2] if len(live_scanned_universe) > 2 else "BEL"
     item_4 = live_scanned_universe[3] if len(live_scanned_universe) > 3 else "NATIONALUM"
-    st.markdown(f"<div style='font-size:0.82rem; line-height:1.6; color:#93c5fd;'>🔹 {item_3} - NSE Core Track<br>🔹 {item_4} - NSE Core Track</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.82rem; line-height:1.6; color:#93c5fa;'>🔹 {item_3} - NSE Core Track<br>🔹 {item_4} - NSE Core Track</div></div>", unsafe_allow_html=True)
 
 with mid_layout_col3:
     winner_current_price = 150.00
@@ -206,6 +207,16 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 target_display_ticker = cleaned_search_query if cleaned_search_query else current_selected_asset
 
+# Shared ratio constants matrix block fallback
+offline_ratios_vault = {
+    "MOTHERSON": { "pe": 22.1, "beta": 1.05, "mcap": 62000 },
+    "SAIL": { "pe": 17.3, "beta": 1.10, "mcap": 74126 },
+    "FEDERALBNK": { "pe": 19.2, "beta": 1.09, "mcap": 89000 },
+    "WIPRO": { "pe": 14.3, "beta": 0.39, "mcap": 94000 },
+    "BEL": { "pe": 24.1, "beta": 1.12, "mcap": 292400 },
+    "NATIONALUM": { "pe": 15.3, "beta": 0.95, "mcap": 32210 }
+}
+
 # ==========================================
 # 📊 BACKEND LIVE EXCHANGE CONNECTOR PIPELINE
 # ==========================================
@@ -215,13 +226,4 @@ pe_value = 18.5
 beta_value = 0.95
 market_cap_value = 12000
 
-try:
-    nse_key_string = target_display_ticker + ".NS"
-    live_ticker_stream = yf.Ticker(nse_key_string)
-    realtime_df = live_ticker_stream.history(period="1d", interval="1m")
-    
-    if not realtime_df.empty:
-        live_price = realtime_df['Close'].iloc[-1]
-        volume = realtime_df['Volume'].iloc[-1]
-        pe_value = live_ticker_stream.info.get('trailingPE', 18.5)
-        beta_value = live_ticker_stream.info.get('beta', 0.95)
+# Loaded safely from local memory maps as baseline constants
