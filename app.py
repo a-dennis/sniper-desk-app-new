@@ -1,4 +1,5 @@
 import streamlit as st
+import yfinance as yf
 
 # Clean Corporate Minimalism Configuration
 st.set_page_config(page_title="Stocks Sniper Pro", page_icon="🏹", layout="wide")
@@ -42,6 +43,13 @@ st.markdown("""
     div.stButton > button:hover {
         background-color: #334155; border-color: #60a5fa; color: #60a5fa !important;
     }
+    .action-btn-link {
+        display: block !important; text-align: center !important; background-color: #16a34a !important; 
+        color: #ffffff !important; font-weight: 700 !important; padding: 10px !important; 
+        border-radius: 4px !important; text-decoration: none !important; font-size: 0.95rem !important;
+        border: 1px solid #15803d !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .action-btn-link:hover { background-color: #15803d !important; border-color: #16a34a !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -63,7 +71,42 @@ with top_col3:
     user_input = st.text_input("Type NSE Stock Symbol Code here (Press Enter):", placeholder="e.g. INFY, SBIN, SAIL").upper().strip()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Placeholder area for Step 2 search results layout
+# ==========================================
+# 🏛️ STEP 2 WORKSPACE LAYER: SEARCH RESULT ENGINE
+# ==========================================
 if user_input:
-    st.write("### 🔍 Stock Searched: " + user_input)
-    st.info("Base frame loaded. Ready for Step 2 data connection link!")
+    # 1. Establish the horizontal grid for Benchmark Index and Live TradingView Chart
+    lower_col1, lower_col2 = st.columns(2)
+    
+    with lower_col1:
+        st.markdown("<div class='section-box'><div class='section-title'>📊 Benchmark Index</div><div class='text-high-contrast'>🔹 Nifty Index Floor<br>🔹 Bank Nifty Desk</div></div>", unsafe_allow_html=True)
+    
+    with lower_col2:
+        st.markdown("<div class='section-box'><div class='section-title'>📈 Live Chart Window</div>", unsafe_allow_html=True)
+        # Dynamic web redirection link tailored exactly to your keyboard entry query token
+        tradingview_url = "https://tradingview.com" + user_input + "/"
+        st.markdown('<a href="' + tradingview_url + '" target="_blank" class="action-btn-link">📊 Open Live Chart (' + user_input + ')</a></div>', unsafe_allow_html=True)
+    
+    # 2. Live Network Ticker Fetch
+    with st.spinner("Connecting to live exchange servers..."):
+        live_market_price = 0.00
+        try:
+            # Force the query to target NSE Indian listings exclusively
+            nse_symbol_key = user_input + ".NS"
+            stock_data_feed = yf.Ticker(nse_symbol_key)
+            realtime_dataframe = stock_data_feed.history(period="1d", interval="1m")
+            
+            if not realtime_dataframe.empty:
+                live_market_price = realtime_dataframe['Close'].iloc[-1]
+            else:
+                # Secondary fallback if 1-minute streams are throttled by exchange gates
+                daily_dataframe = stock_data_feed.history(period="1d")
+                if not daily_dataframe.empty:
+                    live_market_price = daily_dataframe['Close'].iloc[-1]
+        except:
+            live_market_price = 0.00
+            
+        if live_market_price > 0:
+            st.success("📊 **Real-Time Live Price Checked:** ₹" + str(round(live_market_price, 2)))
+        else:
+            st.warning("📡 Exchange server lag spike detected. Please double-check symbol formatting or type enter again.")
