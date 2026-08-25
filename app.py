@@ -1,5 +1,6 @@
 import streamlit as st
 import yfinance as yf
+import requests
 
 # Force elite institutional full-width configuration layout
 st.set_page_config(page_title="STOCKSCAN GLOBAL", page_icon="📊", layout="wide")
@@ -108,24 +109,23 @@ header_col1, header_col2, header_col3, header_col4, header_col5 = st.columns([1.
 with header_col1:
     st.markdown("<div style='line-height:2.5; font-size: 1.35rem; font-weight: 900; color: #ffffff; letter-spacing: 0.5px;'>📊 STOCKSCAN GLOBAL</div>", unsafe_allow_html=True)
 
-# MODIFIED: Converted text markers into active click-action navigation loops
 with header_col2:
-    if st.button("📋 FEEDS", type="secondary" if st.session_state.selected_view_tab != "FEEDS" else "primary"):
+    if st.button("📋 FEEDS"):
         st.session_state.selected_view_tab = "FEEDS"
         st.rerun()
 
 with header_col3:
-    if st.button("⚙️ SELECT SCREENING FILTER", type="secondary" if st.session_state.selected_view_tab != "SELECT SCREENING FILTER" else "primary"):
+    if st.button("⚙️ SELECT SCREENING FILTER"):
         st.session_state.selected_view_tab = "SELECT SCREENING FILTER"
         st.rerun()
 
 with header_col4:
-    if st.button("💎 STOCK OF THE DAY", type="secondary" if st.session_state.selected_view_tab != "STOCK OF THE DAY" else "primary"):
+    if st.button("💎 STOCK OF THE DAY"):
         st.session_state.selected_view_tab = "STOCK OF THE DAY"
         st.rerun()
 
 with header_col5:
-    if st.button("🏹 MANUAL SCANNER INTERFACE", type="secondary" if st.session_state.selected_view_tab != "MANUAL SCANNER INTERFACE" else "primary"):
+    if st.button("🏹 MANUAL SCANNER INTERFACE"):
         st.session_state.selected_view_tab = "MANUAL SCANNER INTERFACE"
         st.rerun()
 
@@ -163,29 +163,24 @@ mid_col1, mid_col2, mid_col3 = st.columns([1.4, 1.3, 1.3])
 
 with mid_col1:
     st.markdown("<div class='grid-box-accent'><div class='grid-box-title'>FILTER CRITERIA DESK ⚙️</div>", unsafe_allow_html=True)
-    # Renders ONLY if the screening option tab or manual desktop views are clicked active
     if st.session_state.selected_view_tab in ["SELECT SCREENING FILTER", "MANUAL SCANNER INTERFACE"]:
-        selected_view_filter = st.selectbox("Filter Dropdown:", ["Volume Shocker", "Top Gainers", "Smart Breakout"], label_visibility="collapsed")
         item_1 = live_scanned_universe[0] if len(live_scanned_universe) > 0 else "SAIL"
-        item_2 = live_scanned_universe[1] if len(live_scanned_universe) > 1 else "FEDERALBNK"
-        st.markdown(f"<div style='font-size:0.82rem; margin-top:8px;'><b>Active Filter Selection:</b> {selected_view_filter}<br><b>Candidate 1:</b> {item_1} - NSE</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:0.82rem; margin-top:8px;'><b>Active Filter Scan Mode</b><br><b>Candidate 1:</b> " + item_1 + " - NSE</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='font-size:0.82rem; color:#a3b8cc; padding-top:10px;'>Desk section deactivated. Select tab criteria option above to reveal keys.</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with mid_col2:
     st.markdown("<div class='grid-box-accent'><div class='grid-box-title'>RESULT FOR STOCK NAMES 📋</div>", unsafe_allow_html=True)
-    # Renders ONLY if the Feeds tab channel is clicked active
     if st.session_state.selected_view_tab in ["FEEDS", "MANUAL SCANNER INTERFACE"]:
         item_3 = live_scanned_universe[2] if len(live_scanned_universe) > 2 else "BEL"
         item_4 = live_scanned_universe[3] if len(live_scanned_universe) > 3 else "NATIONALUM"
-        st.markdown(f"<div style='font-size:0.82rem; line-height:1.6; color:#93c5fd; padding-top:5px;'>🔹 {item_3} - NSE Live Monitor<br>🔹 {item_4} - NSE Live Monitor</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:0.82rem; line-height:1.6; color:#93c5fd; padding-top:5px;'>🔹 " + item_3 + " - NSE Live Monitor<br>🔹 " + item_4 + " - NSE Live Monitor</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='font-size:0.82rem; color:#a3b8cc; padding-top:10px;'>Feeds pipeline tracking deactivated. Select FEEDS menu above.</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 with mid_col3:
-    # Renders ONLY if the Stock of the Day tab layer is clicked active
     if st.session_state.selected_view_tab in ["STOCK OF THE DAY", "MANUAL SCANNER INTERFACE"]:
         winner_current_price = 150.00
         try:
@@ -197,7 +192,22 @@ with mid_col3:
         except:
             winner_current_price = 150.00
             
-        st.markdown(f"""
-            <div class='winner-card-container'>
-                <div class='gold-star-badge'>⭐ THE TODAY'S WINNER</div>
-                <div class='winner-asset-title'>{current_selected_asset} INDUSTRIES</div>
+        st.markdown("<div class='winner-card-container'><div class='gold-star-badge'>⭐ THE TODAY'S WINNER</div><div class='winner-asset-title'>" + current_selected_asset + " INDUSTRIES</div><div class='winner-price-ticker'>Market Value: ₹" + str(round(winner_current_price, 2)) + "</div></div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='grid-box-accent' style='min-height:140px;'><div style='font-size:0.82rem; color:#a3b8cc; padding-top:15px;'>Stock of the Day card hidden. Select Menu option tab.</div></div>", unsafe_allow_html=True)
+
+# Navigation Sizing Controls Row
+nav_space_col1, nav_space_col2 = st.columns(2)
+with nav_space_col1:
+    if st.button(" ❬  PREVIOUS CANDIDATE "):
+        st.session_state.active_matrix_index = (st.session_state.active_matrix_index - 1) % len(live_scanned_universe)
+        st.rerun()
+with nav_space_col2:
+    if st.button(" NEXT CANDIDATE  ❭ "):
+        st.session_state.active_matrix_index = (st.session_state.active_matrix_index + 1) % len(live_scanned_universe)
+        st.rerun()
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ==========================================
+# 🔍 SEARCH BAR MODULE INPUT INTERFACE
