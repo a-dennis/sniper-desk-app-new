@@ -113,11 +113,9 @@ recommended_ticker = sniped_pool[st.session_state.sniped_index]
 # ==========================================
 st.markdown("<div class='section-title'>🎯 Automated Sniped Stock Recommendation</div>", unsafe_allow_html=True)
 
-# Forced dynamic live market quote engine bypassing internal caches completely
 rec_price = 175.50
 try:
     rec_symbol = recommended_ticker + ".NS"
-    # FORCE LIVE DATA STREAM: Fetching strict real-time live data frames directly
     rec_stock = yf.Ticker(rec_symbol)
     rec_hist = rec_stock.history(period="1d", interval="1m")
     if not rec_hist.empty:
@@ -234,3 +232,4 @@ if st.button("RUN DEEP STRATEGY SCAN"):
                 st.write("10. Institutional Volume Surge: 🟢 PASS")
                 st.write("11. Intraday Speed Test (Accelerating): ", "🟢 PASS" if r11 else "🔴 FAIL")
     else:
+        st.warning("Please type a ticker name first!")
