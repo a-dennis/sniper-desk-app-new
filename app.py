@@ -75,7 +75,6 @@ with top_col3:
 # 🏛️ STEP 2 WORKSPACE LAYER: SEARCH RESULT ENGINE
 # ==========================================
 if user_input:
-    # 1. Establish the horizontal grid for Benchmark Index and Live TradingView Chart
     lower_col1, lower_col2 = st.columns(2)
     
     with lower_col1:
@@ -83,15 +82,12 @@ if user_input:
     
     with lower_col2:
         st.markdown("<div class='section-box'><div class='section-title'>📈 Live Chart Window</div>", unsafe_allow_html=True)
-        # Dynamic web redirection link tailored exactly to your keyboard entry query token
         tradingview_url = "https://tradingview.com" + user_input + "/"
         st.markdown('<a href="' + tradingview_url + '" target="_blank" class="action-btn-link">📊 Open Live Chart (' + user_input + ')</a></div>', unsafe_allow_html=True)
     
-    # 2. Live Network Ticker Fetch
-    with st.spinner("Connecting to live exchange servers..."):
+    with st.spinner("Connecting to live exchange data streams..."):
         live_market_price = 0.00
         try:
-            # Force the query to target NSE Indian listings exclusively
             nse_symbol_key = user_input + ".NS"
             stock_data_feed = yf.Ticker(nse_symbol_key)
             realtime_dataframe = stock_data_feed.history(period="1d", interval="1m")
@@ -99,7 +95,6 @@ if user_input:
             if not realtime_dataframe.empty:
                 live_market_price = realtime_dataframe['Close'].iloc[-1]
             else:
-                # Secondary fallback if 1-minute streams are throttled by exchange gates
                 daily_dataframe = stock_data_feed.history(period="1d")
                 if not daily_dataframe.empty:
                     live_market_price = daily_dataframe['Close'].iloc[-1]
@@ -109,4 +104,4 @@ if user_input:
         if live_market_price > 0:
             st.success("📊 **Real-Time Live Price Checked:** ₹" + str(round(live_market_price, 2)))
         else:
-            st.warning("📡 Exchange server lag spike detected. Please double-check symbol formatting or type enter again.")
+            st.warning("📡 Exchange server connection standby. Type your symbol and press Enter.")
