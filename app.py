@@ -73,68 +73,52 @@ st.markdown("""
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.3rem; color:#8b949e;'>STOCKS SNIPER PRO</span></div>", unsafe_allow_html=True)
 
-# ==========================================
-# 📡 100% PURE REAL-TIME FETCH LOGIC (NO STOCK NAMES STAMPED)
-# ==========================================
-@st.cache_data(ttl=10)
-def get_live_market_tickers(filter_type):
-    try:
-        index_map = {
-            "Volume Shocker": "^NSEI",
-            "Top Gainers": "^NSEBANK",
-            "Smart Breakout": "CNXINFRA.NS"
-        }
-        target_index = index_map.get(filter_type, "^NSEI")
-        index_connection = yf.Ticker(target_index)
-        live_movers = index_connection.info.get('components', [])
-        
-        if live_movers and len(live_movers) > 0:
-            return [t.replace('.NS', '') for t in live_movers[:4]]
-            
-        search_query_engine = yf.Search(query="NSE", max_results=20)
-        extracted_scraped_tickers = []
-        for item in search_query_engine.quotes:
-            clean_token = item['symbol'].replace('.NS', '')
-            if '.NS' in item['symbol'] and len(clean_token) <= 6 and not clean_token.startswith('^'):
-                if clean_token not in extracted_scraped_tickers:
-                    extracted_scraped_tickers.append(clean_token)
-                    
-        if len(extracted_scraped_tickers) >= 5:
-            if filter_type == "Volume Shocker":
-                return extracted_scraped_tickers[:3]
-            elif filter_type == "Top Gainers":
-                return extracted_scraped_tickers[2:5]
-            else:
-                return extracted_scraped_tickers[4:7]
-    except:
-        pass
-    return ["SYNCING..."]
+if "market_mode" not in st.session_state:
+    st.session_state.market_mode = "Indian Stock Market"
 
 # ==========================================
-# 🧠 DYNAMIC QUANT ENGINE FOR STOCK OF THE DAY
+# 📡 100% PURE REAL-TIME FETCH LOGIC (NO STOCK NAMES HARDCODED)
+# ==========================================
+@st.cache_data(ttl=15)
+def get_live_market_tickers(filter_type):
+    # Map filters directly to major sectoral tracking data symbols on the live exchange
+    index_map = {
+        "Volume Shocker": "^NSEI",     # Nifty 50 main volume tracker
+        "Top Gainers": "^NSEBANK",     # Bank Nifty tracker index
+        "Smart Breakout": "CNXINFRA.NS" # Nifty Infrastructure tracker index
+    }
+    target_index = index_map.get(filter_type, "^NSEI")
+    index_connection = yf.Ticker(target_index)
+    live_movers = index_connection.info.get('components', [])
+    
+    if live_movers and len(live_movers) > 0:
+        return [t.replace('.NS', '') for t in live_movers[:4]]
+        
+    # PURE FUNCTIONAL BASELINE TEXT IF EXTERNAL NETWORK CHOKES: No hidden names allowed!
+    return ["FETCHING LIVE EXCHANGE MOVERS..."]
+
+# ==========================================
+# 🧠 DYNAMIC QUANT ENGINE FOR STOCK OF THE DAY (NO STOCK NAMES HARDCODED)
 # ==========================================
 @st.cache_data(ttl=15)
 def calculate_stock_of_the_day():
-    try:
-        search_engine = yf.Search(query="NSE", max_results=10)
-        candidates = [item['symbol'] for item in search_engine.quotes if '.NS' in item['symbol'] and not item['symbol'].startswith('^')]
-        
-        best_candidate = "SEARCHING..."
-        highest_volume = -1
-        
-        if candidates:
-            for symbol in candidates[:6]:
-                ticker_obj = yf.Ticker(symbol)
-                df = ticker_obj.history(period="1d", interval="5m")
-                if not df.empty:
-                    current_volume = df['Volume'].iloc[-1]
-                    if current_volume > highest_volume:
-                        highest_volume = current_volume
-                        best_candidate = symbol.replace('.NS', '')
-            return best_candidate
-    except:
-        pass
-    return "SEARCHING..."
+    search_engine = yf.Search(query="NSE", max_results=5)
+    candidates = [item['symbol'] for item in search_engine.quotes if '.NS' in item['symbol'] and not item['symbol'].startswith('^')]
+    
+    best_candidate = "SEARCHING REGISTRIES..."
+    highest_volume = -1
+    
+    if candidates:
+        for symbol in candidates:
+            ticker_obj = yf.Ticker(symbol)
+            df = ticker_obj.history(period="1d", interval="5m")
+            if not df.empty:
+                current_volume = df['Volume'].iloc[-1]
+                if current_volume > highest_volume:
+                    highest_volume = current_volume
+                    best_candidate = symbol.replace('.NS', '')
+        return best_candidate
+    return "CONNECTING TO EXCHANGE..."
 
 stock_of_the_day_ticker = calculate_stock_of_the_day()
 
@@ -168,7 +152,7 @@ with top_col2:
 
 with top_col3:
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Scanner Interface</div>", unsafe_allow_html=True)
-    user_input = st.text_input("Type NSE Stock Symbol Code here (Press Enter):", placeholder="e.g. INFY, SBIN, SAIL").upper().strip()
+    user_input = st.text_input("Type NSE Stock Symbol Code here (Press Enter):", placeholder="e.g. INFY, SBIN, GMRINFRA").upper().strip()
 
 # ==========================================
 # 🏛️ LOWER WORKSPACE ROW FOR MANUAL SEARCH RESULTS
@@ -206,7 +190,6 @@ if user_input:
             except:
                 pass
 
-            # FIXED: 100% stripped of all hardcoded stock references to allow uninhibited data loop math
             r1 = 50 <= live_price <= 500
             r2 = pe_ratio <= 25
             r3 = 0.60 <= beta_val <= 1.20
@@ -215,3 +198,9 @@ if user_input:
             
             st.success("📊 **Live Price Checked:** ₹" + str(round(live_price, 2)))
             
+            st.markdown("<div class='section-box'><div class='section-title'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
+            st.write("1. CMP Allocation Range Layer ➔ ", "PASS 🟢" if r1 else "FAIL 🔴")
+            st.write("2. Valuation Cap Threshold (P/E) ➔ ", "PASS 🟢" if r2 else "🔴 FAIL", f" (P/E: {pe_ratio:.2f})")
+            st.write("3. Volatility Shield (Beta) ➔ ", "PASS 🟢" if r3 else "🔴 FAIL", f" (Beta: {beta_val:.2f})")
+            st.write("4. Market Capitalization Cushion ➔ ", "PASS 🟢" if r4 else "🔴 FAIL")
+            st.write("5. Volume Liquidity Depth ➔ ", "PASS 🟢" if r5 else "🔴 FAIL")
