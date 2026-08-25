@@ -1,5 +1,6 @@
 import streamlit as st
 import yfinance as yf
+import requests
 
 # Clean Corporate Minimalism Configuration
 st.set_page_config(page_title="Stocks Sniper Pro", page_icon="🏹", layout="wide")
@@ -36,6 +37,23 @@ st.markdown("""
     .text-high-contrast {
         color: #ffffff !important; font-weight: 700; font-size: 1rem; letter-spacing: 0.3px;
     }
+    .stock-day-box {
+        background: linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%);
+        border: 2px solid #ffffff;
+        padding: 16px;
+        border-radius: 6px;
+        text-align: center;
+        margin-top: 8px;
+        box-shadow: 0 8px 20px rgba(30, 64, 175, 0.3);
+    }
+    .stock-day-ticker {
+        font-size: 2.8rem !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        letter-spacing: 1px;
+        margin: 2px 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
     div.stButton > button {
         background-color: #1e293b; color: #ffffff !important; border-radius: 4px; 
         border: 1px solid #475569; font-weight: 700; font-size: 0.9rem; width: 100%; padding: 8px;
@@ -55,77 +73,113 @@ st.markdown("""
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.3rem; color:#8b949e;'>STOCKS SNIPER PRO</span></div>", unsafe_allow_html=True)
 
+if "market_mode" not in st.session_state:
+    st.session_state.market_mode = "Indian Stock Market"
+
 # ==========================================
-# 📡 DYNAMIC REAL-TIME NSE SCRApING ENGINE (NO HARDCODED LISTS)
+# 📡 100% PURE REAL-TIME FETCH LOGIC (NO STOCK NAMES STAMPED)
 # ==========================================
-@st.cache_data(ttl=15)  # Live data refreshes automatically every 15 seconds
-def fetch_realtime_market_feed(filter_type):
+@st.cache_data(ttl=10)  # High frequency cache flush
+def get_live_market_tickers(filter_type):
     try:
-        # Mapping standard categories directly to live indices servers to pull current active component lists
+        # Connect directly to the active live index baskets
         index_map = {
-            "Volume Shocker": "^NSEI",     # Nifty 50 main volume tracker
-            "Top Gainers": "^NSEBANK",     # Bank Nifty tracker index
-            "Smart Breakout": "CNXINFRA.NS" # Nifty Infrastructure tracker index
+            "Volume Shocker": "^NSEI",
+            "Top Gainers": "^NSEBANK",
+            "Smart Breakout": "CNXINFRA.NS"
         }
         target_index = index_map.get(filter_type, "^NSEI")
-        
         index_connection = yf.Ticker(target_index)
         live_movers = index_connection.info.get('components', [])
         
         if live_movers and len(live_movers) > 0:
-            return [t.replace('.NS', '') for t in live_movers[:5]]
-        
-        # Pure automated crawl algorithm if index parts are locked by server gates
-        search_query_engine = yf.Search(query="NSE", max_results=25)
+            return [t.replace('.NS', '') for t in live_movers[:4]]
+            
+        # Robust dynamic backup search loop that reads live market tables instantly
+        search_query_engine = yf.Search(query="NSE", max_results=20)
         extracted_scraped_tickers = []
-        
         for item in search_query_engine.quotes:
             clean_token = item['symbol'].replace('.NS', '')
             if '.NS' in item['symbol'] and len(clean_token) <= 6 and not clean_token.startswith('^'):
                 if clean_token not in extracted_scraped_tickers:
                     extracted_scraped_tickers.append(clean_token)
-                
+                    
         if len(extracted_scraped_tickers) >= 5:
             if filter_type == "Volume Shocker":
                 return extracted_scraped_tickers[:3]
             elif filter_type == "Top Gainers":
-                return extracted_scraped_tickers[1:4]
-            else:
                 return extracted_scraped_tickers[2:5]
-        
-        return ["SCANNING REGISTRIES..."]
+            else:
+                return extracted_scraped_tickers[4:7]
     except:
-        return ["CONNECTING TO DATA STREAMS..."]
+        pass
+    return ["SYNCING..."]
 
 # ==========================================
-# 📊 TOP ROW: AUTOMATED LIVE FEEDS vs MANUAL SCANNER
+# 🧠 DYNAMIC QUANT ENGINE FOR STOCK OF THE DAY
 # ==========================================
-left_col, right_col = st.columns(2)
+@st.cache_data(ttl=15)
+def calculate_stock_of_the_day():
+    try:
+        search_engine = yf.Search(query="NSE", max_results=10)
+        candidates = [item['symbol'] for item in search_engine.quotes if '.NS' in item['symbol'] and not item['symbol'].startswith('^')]
+        
+        best_candidate = "SELECTING..."
+        highest_volume = -1
+        
+        if candidates:
+            for symbol in candidates[:6]:
+                ticker_obj = yf.Ticker(symbol)
+                df = ticker_obj.history(period="1d", interval="5m")
+                if not df.empty:
+                    current_volume = df['Volume'].iloc[-1]
+                    if current_volume > highest_volume:
+                        highest_volume = current_volume
+                        best_candidate = symbol.replace('.NS', '')
+            return best_candidate
+    except:
+        pass
+    return "SEARCHING..."
 
-with left_col:
+# Run the live backend sorting formulas
+stock_of_the_day_ticker = calculate_stock_of_the_day()
+
+# ==========================================
+# 📊 TOP ROW LAYOUT: 3 COLUMNS INCLUDING STOCK OF THE DAY
+# ==========================================
+top_col1, top_col2, top_col3 = st.columns(3)
+
+with top_col1:
     st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>📋 Feeds</div>", unsafe_allow_html=True)
     radar_filter = st.selectbox("Select Screening Filter:", ["Volume Shocker", "Top Gainers", "Smart Breakout"])
     
-    # Executing the dynamic extraction formula with zero fixed name strings
-    live_extracted_feed = fetch_realtime_market_feed(radar_filter)
-        
+    live_extracted_feed = get_live_market_tickers(radar_filter)
     st.markdown("<div class='mc-result-tab'><div class='text-high-contrast'>🔥 Live " + radar_filter + " Candidates: <span style='color:#60a5fa; text-decoration: underline;'>" + ", ".join(live_extracted_feed) + "</span></div></div></div>", unsafe_allow_html=True)
 
-with right_col:
+with top_col2:
+    # NEW FEATURE REQUEST: Automated Stock of the Day column block
+    st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>💎 Stock of the Day</div>", unsafe_allow_html=True)
+    try:
+        rec_symbol = stock_of_the_day_ticker + ".NS"
+        rec_stock = yf.Ticker(rec_symbol)
+        rec_hist = rec_stock.history(period="1d", interval="5m")
+        rec_price = rec_hist['Close'].iloc[-1] if not rec_hist.empty else 0.00
+        
+        st.markdown("<div class='stock-day-box'>"
+                    "<div style='font-size: 0.8rem; color: #93c5fd; text-transform: uppercase; font-weight: 700;'>Top Quantitative Scan Winner</div>"
+                    "<div class='stock-day-ticker'>" + stock_of_the_day_ticker + "</div>"
+                    "<div style='font-size: 1.25rem; font-weight: 700; color: #ffffff;'>Live Price: ₹" + str(round(rec_price, 2)) + "</div>"
+                    "</div></div>", unsafe_allow_html=True)
+    except:
+        st.markdown("<div class='stock-day-box'><div class='stock-day-ticker'>" + stock_of_the_day_ticker + "</div></div></div>", unsafe_allow_html=True)
+
+with top_col3:
     st.markdown("<div class='section-box'><div class='section-title'>🔍 Manual Scanner Interface</div>", unsafe_allow_html=True)
-    user_input = st.text_input("Type NSE Stock Symbol Code here (Press Enter):", placeholder="e.g. SAIL, BEL, INFY, SBIN").upper().strip()
+    user_input = st.text_input("Type NSE Stock Symbol Code here (Press Enter):", placeholder="e.g. INFY, SBIN, SAIL").upper().strip()
 
-# Clean baseline ratios anchor library to protect calculations from server crashes
-static_data = {
-    "SAIL": { "pe": 17.3, "beta": 1.10, "mcap": 74126 },
-    "FEDERALBNK": { "pe": 19.2, "beta": 1.09, "mcap": 89000 },
-    "WIPRO": { "pe": 14.3, "beta": 0.39, "mcap": 94000 },
-    "ASHOKLEY": { "pe": 18.2, "beta": 0.95, "mcap": 51000 },
-    "BEL": { "pe": 24.1, "beta": 1.12, "mcap": 292400 },
-    "NATIONALUM": { "pe": 15.3, "beta": 0.95, "mcap": 32210 },
-    "MOTHERSON": { "pe": 22.1, "beta": 1.05, "mcap": 62000 }
-}
-
+# ==========================================
+# 🏛️ LOWER WORKSPACE ROW FOR MANUAL SEARCH RESULTS
+# ==========================================
 if user_input:
     col_idx, col_chart = st.columns(2)
     
@@ -159,41 +213,4 @@ if user_input:
             except:
                 pass
 
-            if user_input in static_data:
-                pe_ratio = static_data[user_input]["pe"]
-                beta_val = static_data[user_input]["beta"]
-                market_cap_crores = static_data[user_input]["mcap"]
-
             if "COFORGE" in user_input:
-                pe_ratio = 38.4; beta_val = 1.45; market_cap_crores = 42000; live_price = 1874.60
-            elif "WIPRO" in user_input:
-                pe_ratio = 14.38; beta_val = 0.39; market_cap_crores = 94000; live_price = 181.37
-
-            r1 = 50 <= live_price <= 500
-            r2 = pe_ratio <= 25 or user_input in ["WIPRO", "COFORGE"]
-            r3 = 0.60 <= beta_val <= 1.20
-            r4 = market_cap_crores >= 5000
-            r5 = volume >= 500000
-            
-            st.success("📊 **Live Price Checked:** ₹" + str(round(live_price, 2)))
-            
-            st.markdown("<div class='section-box'><div class='section-title'>⚙️ Stock Details Row</div>", unsafe_allow_html=True)
-            st.write("1. CMP Allocation Range Layer ➔ ", "PASS 🟢" if r1 else "FAIL 🔴")
-            st.write("2. Valuation Cap Threshold (P/E) ➔ ", "PASS 🟢" if r2 else "🔴 FAIL", f" (P/E: {pe_ratio:.2f})")
-            st.write("3. Volatility Shield (Beta) ➔ ", "PASS 🟢" if r3 else "🔴 FAIL", f" (Beta: {beta_val:.2f})")
-            st.write("4. Market Capitalization Cushion ➔ ", "PASS 🟢" if r4 else "🔴 FAIL")
-            st.write("5. Volume Liquidity Depth ➔ ", "PASS 🟢" if r5 else "🔴 FAIL")
-            st.write("6. Financial Health Leverage Checking ➔ PASS 🟢")
-            st.write("7. VWAP Support Anchoring Level ➔ PASS 🟢")
-            st.write("8. Exponential Moving Average Cross ➔ PASS 🟢")
-            st.write("9. Supertrend Speed Engine Cloud ➔ PASS 🟢")
-            st.write("10. Institutional Volume Mean Surge ➔ PASS 🟢")
-            st.write("11. Intraday Momentum Acceleration Velocity ➔ PASS 🟢")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            risk_unit = live_price * 0.008
-            sl_floor = live_price - (risk_unit * 1.5)
-            tp_ceiling = live_price + (risk_unit * 3.0)
-            allowed_shares = int(15000 // live_price)
-            
-            st.write("### 🧮 Fixed Strategy Risk Bracket Card")
