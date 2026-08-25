@@ -73,11 +73,8 @@ st.markdown("""
 
 st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.3rem; color:#8b949e;'>STOCKS SNIPER PRO</span></div>", unsafe_allow_html=True)
 
-if "market_mode" not in st.session_state:
-    st.session_state.market_mode = "Indian Stock Market"
-
 # ==========================================
-# 📡 100% PURE REAL-TIME FETCH LOGIC (NO HARDCODED NAMES)
+# 📡 100% PURE REAL-TIME FETCH LOGIC (NO STOCK NAMES STAMPED)
 # ==========================================
 @st.cache_data(ttl=10)
 def get_live_market_tickers(filter_type):
@@ -122,7 +119,7 @@ def calculate_stock_of_the_day():
         search_engine = yf.Search(query="NSE", max_results=10)
         candidates = [item['symbol'] for item in search_engine.quotes if '.NS' in item['symbol'] and not item['symbol'].startswith('^')]
         
-        best_candidate = "SELECTING..."
+        best_candidate = "SEARCHING..."
         highest_volume = -1
         
         if candidates:
@@ -209,10 +206,12 @@ if user_input:
             except:
                 pass
 
-            # INDENTATION REPAIR LOCKED: Dynamic evaluation parameters block aligned perfectly inside condition blocks
-            if "COFORGE" in user_input:
-                pe_ratio = 38.4
-                beta_val = 1.45
-                market_cap_crores = 42000
-                live_price = 1874.60
-            elif "WIPRO" in user_input:
+            # FIXED: 100% stripped of all hardcoded stock references to allow uninhibited data loop math
+            r1 = 50 <= live_price <= 500
+            r2 = pe_ratio <= 25
+            r3 = 0.60 <= beta_val <= 1.20
+            r4 = market_cap_crores >= 5000
+            r5 = volume >= 500000
+            
+            st.success("📊 **Live Price Checked:** ₹" + str(round(live_price, 2)))
+            
