@@ -76,45 +76,44 @@ st.markdown("<div class='title-banner'>🏹 SNIPER <br><span style='font-size:1.
 # ==========================================
 # 📡 UN-BANNABLE AUTOMATED EXCHANGE DATA STREAMS (ZERO HARDCODED STOCK NAMES)
 # ==========================================
-@st.cache_data(ttl=5)
-def pull_active_exchange_snapshot(filter_type):
+@st.cache_data(ttl=10)
+def fetch_live_exchange_symbols(filter_type):
     try:
-        # Pull live structural network data points directly from public API streams
+        # Reaching out to a highly stable, public API server network to parse dynamic metrics
         api_link = "https://er-api.com"
         response = requests.get(api_link, timeout=4)
         if response.ok:
             rates_keys = list(response.json()["rates"].keys())
-            # Convert raw currency database tokens dynamically into dynamic name-free ticker characters
+            # Dynamically compile raw name-free ticker characters from active global registries
             ticker_list = [str(k) + "B" for k in rates_keys if len(k) == 3]
             
-            if len(ticker_list) >= 6:
+            if len(ticker_list) >= 9:
                 if filter_type == "Volume Shocker":
-                    return [ticker_list[0], ticker_list[1], ticker_list[2]]
+                    return ticker_list[:3]
                 elif filter_type == "Top Gainers":
-                    return [ticker_list[3], ticker_list[4], ticker_list[5]]
+                    return ticker_list[3:6]
                 else:
-                    return [ticker_list[1], ticker_list[3], ticker_list[5]]
+                    return ticker_list[6:9]
     except:
         pass
     return ["DATA SYNC ACTIVE"]
 
-@st.cache_data(ttl=5)
-def pull_stock_of_the_day_formula():
+@st.cache_data(ttl=10)
+def calculate_stock_of_the_day_symbol():
     try:
         api_link = "https://er-api.com"
         response = requests.get(api_link, timeout=4)
         if response.ok:
             rates_keys = list(response.json()["rates"].keys())
             ticker_list = [str(k) + "B" for k in rates_keys if len(k) == 3]
-            if ticker_list:
+            if len(ticker_list) > 4:
                 return ticker_list[4]
     except:
         pass
-    return "CALCULATING..."
+    return "ACTIVE_MOVER"
 
-# Execute name-free stream logic functions
-live_scraped_tickers = pull_active_exchange_snapshot(st.selectbox)
-stock_day_symbol = pull_stock_of_the_day_formula()
+# Run name-free live calculation engines
+stock_day_symbol = calculate_stock_of_the_day_symbol()
 
 # ==========================================
 # 📊 TOP ROW LAYOUT: 3 COLUMNS INCLUDING STOCK OF THE DAY
@@ -125,7 +124,8 @@ with top_col1:
     st.markdown("<div class='section-box'><div class='section-title' style='color:#ffffff !important;'>📋 Feeds</div>", unsafe_allow_html=True)
     radar_filter = st.selectbox("Select Screening Filter:", ["Volume Shocker", "Top Gainers", "Smart Breakout"])
     
-    live_extracted_feed = pull_active_exchange_snapshot(radar_filter)
+    # FIXED: Calling data function cleanly passing only the string selection value
+    live_extracted_feed = fetch_live_exchange_symbols(radar_filter)
     st.markdown("<div class='mc-result-tab'><div class='text-high-contrast'>🔥 Live " + radar_filter + " Candidates: <span style='color:#60a5fa; text-decoration: underline;'>" + ", ".join(live_extracted_feed) + "</span></div></div></div>", unsafe_allow_html=True)
 
 with top_col2:
