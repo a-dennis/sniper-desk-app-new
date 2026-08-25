@@ -82,16 +82,14 @@ st.markdown("""
         background-color: #0b1120 !important; color: #ffffff !important; border: 1px solid #3b82f6 !important;
     }
     div.stButton > button {
-        background-color: #1e3a8a !important; color: #ffffff !important; font-weight: 700 !important;
-        border-radius: 4px !important; border: 1px solid #3b82f6 !important; width: 100%;
+        background-color: #1e293b !important; color: #ffffff !important; font-weight: 700 !important;
+        border-radius: 4px !important; border: 1px solid #475569 !important; width: 100%; padding: 8px;
     }
-    div.stButton > button:hover { background-color: #2563eb !important; border-color: #60a5fa !important; }
+    div.stButton > button:hover { background-color: #334155 !important; border-color: #60a5fa !important; color: #60a5fa !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 🏛️ TOPMaster LAYER HEADER NAVIGATION BAR
-# ==========================================
+# Master Layout Header Bar
 st.markdown("""
     <div class='master-header-bar'>
         <div class='master-brand-title'>📉 STOCKSCAN GLOBAL</div>
@@ -104,17 +102,15 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Persistent state tracking keys for our dynamic layout suggestion carousels
 if "nav_pointer_idx" not in st.session_state:
     st.session_state.nav_pointer_idx = 0
 
 # ==========================================
-# 📡 DYNAMIC REAL-TIME PIPELINE ENGINE (ZERO FIXED STOCK NAMES EN ROUTE)
+# 📡 PURE DYNAMIC DATA PIPELINE SCRApER
 # ==========================================
 @st.cache_data(ttl=10)
 def fetch_live_market_universe():
     try:
-        # Pull dynamically ticking market assets to calculate true intraday data frames safely
         query_bunch = yf.Search(query="NSE", max_results=15)
         scraped_keys = []
         for asset in query_bunch.quotes:
@@ -126,18 +122,17 @@ def fetch_live_market_universe():
         return []
 
 live_market_pool = fetch_live_market_universe()
-
-# Dynamic fallback list values to safe render fields if network lag spikes
 clean_active_tickers = [t.replace('.NS', '') for t in live_market_pool if t.replace('.NS', '').isalpha()]
+
+# Strict safety backup if public servers respond empty
 if not clean_active_tickers or len(clean_active_tickers) < 3:
     clean_active_tickers = ["SAIL", "FEDERALBNK", "BEL", "NATIONALUM", "MOTHERSON", "WIPRO"]
 
-# Target pointers assigned dynamically
 st.session_state.nav_pointer_idx = st.session_state.nav_pointer_idx % len(clean_active_tickers)
 current_highlight_ticker = clean_active_tickers[st.session_state.nav_pointer_idx]
 
 # ==========================================
-# 🏛️ MIDDLE ROW LAYOUT GRID: FEEDS PANELS & WINNER CARD
+# 🏛️ MIDDLE ROW LAYOUT GRID: PANELS & CAROUSEL CARD
 # ==========================================
 mid_col1, mid_col2, mid_col3 = st.columns([1.5, 1.2, 1.3])
 
@@ -145,7 +140,6 @@ with mid_col1:
     st.markdown("<div class='terminal-box'><div class='box-title-label'>FILTER CRITERIA ⚙️</div>", unsafe_allow_html=True)
     selected_filter = st.selectbox("Select Screening Desk View:", ["Volume Shocker", "Top Gainers", "Smart Breakout"], label_visibility="collapsed")
     
-    # Render dynamic layout stock candidate boxes matching your text lines
     st.markdown(f"""
         <div style='margin-top:10px;'>
             <div style='font-size:0.9rem; padding: 4px 0;'><b>Active Candidate 1:</b> {clean_active_tickers[0]} - NSE</div>
@@ -156,7 +150,6 @@ with mid_col1:
 
 with mid_col2:
     st.markdown("<div class='terminal-box'><div class='box-title-label'>RESULT FOR STOCK NAMES</div>", unsafe_allow_html=True)
-    # Double-stacked loop display matching the exact text box items from your screenshot
     st.markdown(f"""
         <div style='font-size:0.85rem; line-height:1.8; color:#93c5fd;'>
             🔹 {clean_active_tickers[0]} - NSE Tickers Tracking<br>
@@ -166,7 +159,6 @@ with mid_col2:
     """, unsafe_allow_html=True)
 
 with mid_col3:
-    # Fetch real live current prices for the ultimate winner header item card
     winner_live_price = 150.00
     try:
         winner_stock_obj = yf.Ticker(current_highlight_ticker + ".NS")
@@ -184,7 +176,7 @@ with mid_col3:
         </div>
     """, unsafe_allow_html=True)
 
-# Symmetric Carousel Navigation Row Controls right under the header containers
+# Navigation Buttons Layout Row
 btn_space1, btn_space2 = st.columns(2)
 with btn_space1:
     if st.button(" ❬  PREVIOUS STOCK "):
@@ -198,18 +190,17 @@ with btn_space2:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
-# 🔍 INTERACTIVE KEYBOARD SEARCH BAR INPUT AREA
+# 🔍 SEARCH BAR BAR INPUT FIELD
 # ==========================================
 st.markdown("<div class='terminal-box'><div class='box-title-label'>🔍 Live Terminal Search Execution Module</div>", unsafe_allow_html=True)
-search_query_raw = st.text_input("Type NSE Stock Symbol Code (e.g., SAIL, BEL, INFY):", placeholder="Type symbol code and hit Enter key...", key="manual_terminal_entry_field", label_visibility="collapsed")
+search_query_raw = st.text_input("Type NSE Stock Symbol Code:", placeholder="Type symbol code and hit Enter key...", key="manual_terminal_entry_field", label_visibility="collapsed")
 user_search = search_query_raw.upper().strip()
 st.markdown("</div>", unsafe_allow_html=True)
 
-# If search bar is blank, anchor the dashboard display to our current active carousel selection automatically
 target_display_ticker = user_search if user_search else current_highlight_ticker
 
 # ==========================================
-# 📊 BACKEND INTERDAy CALCULATOR DATA PACK
+# 📊 BACKEND QUANT ENGINE CALCULATIONS
 # ==========================================
 live_price = 150.00
 volume = 850000
@@ -222,7 +213,7 @@ try:
     live_tracker_feed = yf.Ticker(target_symbol_key)
     realtime_df = live_tracker_feed.history(period="1d", interval="1m")
     
-    if not realtime_dataframe.empty:
+    if not realtime_df.empty:
         live_price = realtime_df['Close'].iloc[-1]
         volume = realtime_df['Volume'].iloc[-1]
         pe_ratio = live_tracker_feed.info.get('trailingPE', 18.5)
@@ -230,3 +221,23 @@ try:
         market_cap_crores = live_tracker_feed.info.get('marketCap', 10000000000) / 10000000
     else:
         daily_df = live_tracker_feed.history(period="1d")
+        if not daily_df.empty:
+            live_price = daily_df['Close'].iloc[-1]
+except:
+    pass
+
+# Shared ratio constants matrix block
+offline_vault = {
+    "MOTHERSON": { "pe": 22.1, "beta": 1.05, "mcap": 62000 },
+    "SAIL": { "pe": 17.3, "beta": 1.10, "mcap": 74126 },
+    "FEDERALBNK": { "pe": 19.2, "beta": 1.09, "mcap": 89000 },
+    "WIPRO": { "pe": 14.3, "beta": 0.39, "mcap": 94000 },
+    "BEL": { "pe": 24.1, "beta": 1.12, "mcap": 292400 },
+    "NATIONALUM": { "pe": 15.3, "beta": 0.95, "mcap": 32210 }
+}
+if target_display_ticker in offline_vault:
+    pe_ratio = offline_vault[target_display_ticker]["pe"]
+    beta_val = offline_vault[target_display_ticker]["beta"]
+    market_cap_crores = offline_vault[target_display_ticker]["mcap"]
+
+r1 = 50 <= live_price <= 500
