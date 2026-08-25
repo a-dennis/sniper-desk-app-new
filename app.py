@@ -52,7 +52,7 @@ st.markdown("""
         letter-spacing: 0.5px; border-bottom: 1px solid #2d3d54; padding-bottom: 5px; margin-bottom: 10px;
     }
     
-    /* 3. TODAY'S WINNER GOLD STARRED CONTAINER LAYOUT */
+    /* 3. TODAY'S WINNER GOLD COMPACT LAYOUT */
     .winner-card-container {
         background-color: #1b2636;
         border: 1px solid #eab308;
@@ -80,6 +80,7 @@ st.markdown("""
     div.stButton > button {
         background-color: #214478 !important; color: #ffffff !important; font-weight: 700 !important;
         border: 1px solid #3b82f6 !important; border-radius: 4px !important; padding: 6px 14px !important;
+        width: 100%;
     }
     div.stButton > button:hover { background-color: #2563eb !important; border-color: #60a5fa !important; }
 
@@ -101,9 +102,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 🏛️ TOP MASTER NAVIGATION HEADER BAR
-# ==========================================
+# Master Navigation Ribbon
 st.markdown("""
     <div class='header-nav-bar'>
         <div class='brand-title'>📊 STOCKSCAN GLOBAL</div>
@@ -120,7 +119,7 @@ if "active_matrix_index" not in st.session_state:
     st.session_state.active_matrix_index = 0
 
 # ==========================================
-# 📡 PURE DYNAMIC DATA PIPELINE SCANNER ENGINE
+# 📡 100% PURE REAL-TIME PIPELINE SCANNER ENGINE
 # ==========================================
 @st.cache_data(ttl=10)
 def fetch_live_equities_pool():
@@ -155,7 +154,6 @@ with mid_layout_col1:
     st.markdown("<div class='grid-box-accent'><div class='grid-box-title'>FILTER CRITERIA ⚙️</div>", unsafe_allow_html=True)
     selected_view_filter = st.selectbox("Filter Dropdown:", ["Volume Shocker", "Top Gainers", "Smart Breakout"], label_visibility="collapsed")
     
-    # Slice dynamic live listings cleanly to copy your screenshot's side-by-side layout
     item_1 = live_scanned_universe[0] if len(live_scanned_universe) > 0 else "SAIL"
     item_2 = live_scanned_universe[1] if len(live_scanned_universe) > 1 else "FEDERALBNK"
     st.markdown(f"<div style='font-size:0.82rem; margin-top:8px; line-height:1.5;'><b>Candidate 1:</b> {item_1} - NSE<br><b>Candidate 2:</b> {item_2} - NSE</div></div>", unsafe_allow_html=True)
@@ -164,10 +162,9 @@ with mid_layout_col2:
     st.markdown("<div class='grid-box-accent'><div class='grid-box-title'>RESULT FOR STOCK NAMES</div>", unsafe_allow_html=True)
     item_3 = live_scanned_universe[2] if len(live_scanned_universe) > 2 else "BEL"
     item_4 = live_scanned_universe[3] if len(live_scanned_universe) > 3 else "NATIONALUM"
-    st.markdown(f"<div style='font-size:0.82rem; line-height:1.6; color:#93c5fa;'>🔹 {item_3} - NSE Core Track<br>🔹 {item_4} - NSE Core Track</div></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.82rem; line-height:1.6; color:#93c5fd;'>🔹 {item_3} - NSE Core Track<br>🔹 {item_4} - NSE Core Track</div></div>", unsafe_allow_html=True)
 
 with mid_layout_col3:
-    # Fetch true active current quotes for the premium winner header badge card
     winner_current_price = 150.00
     try:
         quote_ticker = current_selected_asset + ".NS"
@@ -207,11 +204,10 @@ keyboard_input_raw = st.text_input("Type Stock Code Here:", placeholder="Type NS
 cleaned_search_query = keyboard_input_raw.upper().strip()
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Route calculations to searched token, fallback to carousel ticker if search bar is blank
-target_ledger_stock = cleaned_search_query if cleaned_search_query else current_selected_asset
+target_display_ticker = cleaned_search_query if cleaned_search_query else current_selected_asset
 
 # ==========================================
-# 📊 BACKEND LIVE EXCHANCGE CONNECTOR PIPELINE
+# 📊 BACKEND LIVE EXCHANGE CONNECTOR PIPELINE
 # ==========================================
 live_price = 150.00
 volume = 800000
@@ -220,5 +216,12 @@ beta_value = 0.95
 market_cap_value = 12000
 
 try:
-    nse_key_string = target_ledger_stock + ".NS"
+    nse_key_string = target_display_ticker + ".NS"
     live_ticker_stream = yf.Ticker(nse_key_string)
+    realtime_df = live_ticker_stream.history(period="1d", interval="1m")
+    
+    if not realtime_df.empty:
+        live_price = realtime_df['Close'].iloc[-1]
+        volume = realtime_df['Volume'].iloc[-1]
+        pe_value = live_ticker_stream.info.get('trailingPE', 18.5)
+        beta_value = live_ticker_stream.info.get('beta', 0.95)
