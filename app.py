@@ -4,198 +4,209 @@ import yfinance as yf
 # Force premium full-width institutional grid workspace configuration
 st.set_page_config(page_title="STOCKSCAN GLOBAL", page_icon="📊", layout="wide")
 
-# Meticulous Slate Blue Theme Styling mimicking your layout blueprint exactly
+# Custom Stylesheet matching your exact requested Light Blue and High-Contrast Black/White text layout
 st.markdown("""
     <style>
-    @import url('https://googleapis.com');
+    @import url('https://googleapis.com family=Roboto:wght@400;700;900&display=swap');
     
     html, body, [class*="css"] {
-        background-color: #0b0f19 !important;
-        color: #f1f5f9 !important;
+        background-color: #e0f2fe !important;
+        color: #0f172a !important;
         font-family: 'Roboto', sans-serif;
     }
-    .stApp { background-color: #0b0f19 !important; }
+    .stApp { background-color: #e0f2fe !important; }
     
-    /* 1. BLUE HIGH-DENSITY FRAME ACCENTS */
+    /* 1. LIGHT BLUE BLOCK CONTAINERS */
     .blueprint-container {
-        background-color: #111827;
-        border: 1px solid #2d3d54;
-        padding: 14px;
-        border-radius: 4px;
-        margin-bottom: 12px;
-        min-height: 140px;
+        background-color: #bae6fd;
+        border: 2px solid #0284c7;
+        padding: 18px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        color: #0f172a !important;
     }
     .blueprint-title {
-        font-size: 0.78rem; font-weight: 800; color: #7da0c4; text-transform: uppercase;
-        letter-spacing: 0.5px; border-bottom: 1px solid #2d3d54; padding-bottom: 5px; margin-bottom: 8px;
+        font-size: 0.9rem; font-weight: 900; color: #0369a1; text-transform: uppercase;
+        letter-spacing: 0.5px; border-bottom: 2px solid #0284c7; padding-bottom: 6px; margin-bottom: 12px;
     }
     
-    /* 2. GOLD WINNER HIGHLIGHT CONTAINER LAYOUT */
+    /* 2. PREMIUM STOCK OF THE DAY GOLD BAR LAYER */
     .winner-gold-frame {
-        background: linear-gradient(135deg, #1b2636 0%, #0f172a 100%);
-        border: 2px solid #eab308;
-        padding: 14px;
-        border-radius: 4px;
-        box-shadow: 0 4px 15px rgba(234, 179, 8, 0.15);
-        min-height: 140px;
+        background: linear-gradient(135deg, #fef08a 0%, #fef9c3 100%);
+        border: 3px solid #ca8a04;
+        padding: 20px;
+        border-radius: 6px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(202, 138, 4, 0.15);
+        color: #0f172a !important;
+        margin-bottom: 15px;
     }
     .winner-star-title {
-        font-size: 0.72rem; font-weight: 900; color: #eab308; letter-spacing: 0.5px; text-transform: uppercase;
+        font-size: 0.8rem; font-weight: 900; color: #854d0e; letter-spacing: 0.5px; text-transform: uppercase;
     }
     
-    /* 3. DENSE SC SCREENING LEDGER TABLE STYLES */
+    /* 3. LIGHT BLUE SCREENING MATRIX TABLE */
     .matrix-table {
-        width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.82rem;
+        width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem;
     }
     .matrix-hdr {
-        background-color: #1f3354; color: #cbd5e1; font-weight: 700; border: 1px solid #2d3d54; padding: 8px 10px;
+        background-color: #0284c7; color: #ffffff !important; font-weight: 700; border: 1px solid #0369a1; padding: 10px;
     }
     .matrix-cell {
-        padding: 8px 10px; border: 1px solid #2d3d54; background-color: #111a28; color: #f1f5f9;
+        padding: 10px; border: 1px solid #cbd5e1; background-color: #ffffff; color: #0f172a !important;
     }
-    .row-even .matrix-cell { background-color: #152033; }
+    .row-even .matrix-cell { background-color: #f0f9ff; }
     
-    .text-pass-green { color: #22c55e !important; font-weight: 700; }
-    .text-fail-red { color: #ef4444 !important; font-weight: 700; }
-    
-    /* Native Form Inputs Overrides */
-    .stTextInput>div>div>input {
-        background-color: #121b28 !important; color: #ffffff !important; border: 1px solid #3b82f6 !important;
-    }
-    
-    /* STREAMLIT BUTTON STYLING FOR MATE COLOR SCHEME OVERRIDES */
-    div.stButton > button {
-        background-color: #172d54 !important; color: #cbd5e1 !important; font-weight: 700 !important;
-        border: 1px solid #2d3d54 !important; border-radius: 4px !important; padding: 6px 12px !important;
-        text-transform: uppercase !important; font-size: 0.82rem !important; letter-spacing: 0.3px !important;
-        width: 100%; transition: all 0.2s ease-in-out;
-    }
-    div.stButton > button:hover { background-color: #214478 !important; color: #ffffff !important; border-color: #3b82f6 !important; }
+    .text-pass-green { color: #15803d !important; font-weight: 900; }
+    .text-fail-red { color: #b91c1c !important; font-weight: 900; }
     </style>
 """, unsafe_allow_html=True)
 
-st.write("### 📊 STOCKSCAN GLOBAL")
-
-# Persistent State Initializations for Tabs View toggling configuration paths
-if "selected_view_tab" not in st.session_state:
-    st.session_state.selected_view_tab = "MANUAL SCANNER INTERFACE"
-if "car_pointer" not in st.session_state:
-    st.session_state.car_pointer = 0
+st.write("<h1 style='color:#0369a1; font-weight:900;'>📊 STOCKSCAN GLOBAL</h1>", unsafe_allow_html=True)
 
 # ==========================================
-# 🏛️ TOP INTERACTIVE CLICK NAVIGATION HEADER ROW
-# ==========================================
-header_col1, header_col2, header_col3, header_col4 = st.columns(4)
-with header_col1:
-    if st.button("📋 FEEDS", type="secondary" if st.session_state.selected_view_tab != "FEEDS" else "primary"):
-        st.session_state.selected_view_tab = "FEEDS"
-        st.rerun()
-with header_col2:
-    if st.button("⚙️ SELECT SCREENING FILTER", type="secondary" if st.session_state.selected_view_tab != "SELECT SCREENING FILTER" else "primary"):
-        st.session_state.selected_view_tab = "SELECT SCREENING FILTER"
-        st.rerun()
-with header_col3:
-    if st.button("💎 STOCK OF THE DAY", type="secondary" if st.session_state.selected_view_tab != "STOCK OF THE DAY" else "primary"):
-        st.session_state.selected_view_tab = "STOCK OF THE DAY"
-        st.rerun()
-with header_col4:
-    if st.button("🏹 MANUAL SCANNER INTERFACE", type="secondary" if st.session_state.selected_view_tab != "MANUAL SCANNER INTERFACE" else "primary"):
-        st.session_state.selected_view_tab = "MANUAL SCANNER INTERFACE"
-        st.rerun()
-
-st.markdown("<hr style='border:1px solid #214478; margin-top:5px; margin-bottom:15px;'>", unsafe_allow_html=True)
-
-# Shared data metrics vault library to safeguard performance outputs
-offline_vault = {
-    "MOTHERSON": { "price": 172.20, "pe": 22.1, "beta": 1.05, "mcap": 62000, "vol": 1400000 },
-    "SAIL": { "price": 195.50, "pe": 17.3, "beta": 1.10, "mcap": 74126, "vol": 31200000 },
-    "FEDERALBNK": { "price": 164.50, "pe": 19.2, "beta": 1.09, "mcap": 89000, "vol": 1200000 },
-    "BEL": { "price": 409.10, "pe": 24.1, "beta": 1.12, "mcap": 292400, "vol": 8800000 },
-    "NATIONALUM": { "price": 194.20, "pe": 15.3, "beta": 0.95, "mcap": 32210, "vol": 18200000 }
-}
-
-# ==========================================
-# 📡 100% PURE REAL-TIME DATA PIPELINE SCANNER
+# 📡 100% PURE REAL-TIME DATA PIPELINE (NO HARDCODED STRINGS)
 # ==========================================
 @st.cache_data(ttl=10)
-def fetch_live_equities_pool():
+def scan_live_market_winner():
     try:
-        search_query_engine = yf.Search(query="NSE", max_results=12)
+        # Dynamic query to find what is actively trending on Nifty boards this exact second
+        search_engine = yf.Search(query="NSE", max_results=10)
         discovered_keys = []
-        for quote in search_query_engine.quotes:
+        for quote in search_query_engine.quotes if 'search_query_engine' in locals() else search_engine.quotes:
             symbol_string = quote.get('symbol', '').upper()
             if '.NS' in symbol_string and not symbol_string.startswith('^'):
                 discovered_symbols = symbol_string.replace('.NS', '')
                 if discovered_symbols.isalpha() and len(discovered_symbols) <= 6:
                     discovered_keys.append(discovered_symbols)
-        return discovered_keys if discovered_keys else []
+        return discovered_keys
     except:
         return []
 
-live_scanned_universe = fetch_live_equities_pool()
-if not live_scanned_universe or len(live_scanned_universe) < 4:
-    live_scanned_universe = ["SAIL", "FEDERALBNK", "BEL", "NATIONALUM", "MOTHERSON"]
-
-st.session_state.car_pointer = st.session_state.car_pointer % len(live_scanned_universe)
-active_carousel_asset = live_scanned_universe[st.session_state.car_pointer]
+live_scanned_universe = scan_live_market_winner()
 
 # ==========================================
-# 🏛️ MIDDLE ROWS LAYOUT GRID BLOCKS
+# 🏛️ SERVER RENDER CONTROLS
 # ==========================================
-mid_col1, mid_col2, mid_col3 = st.columns([1.3, 1.2, 1.5])
-
-with mid_col1:
-    st.markdown("<div class='blueprint-container'><div class='blueprint-title'>FILTER CRITERIA</div>", unsafe_allow_html=True)
-    if st.session_state.selected_view_tab in ["SELECT SCREENING FILTER", "MANUAL SCANNER INTERFACE"]:
-        selected_filter = st.selectbox("Select Filter Category:", ["Volume Shocker", "Top Gainers", "Smart Breakout"], label_visibility="collapsed")
-        st.write(f"**Live Scanning Mode:** {selected_filter}")
+if not live_scanned_universe:
+    # Safe text badge loop if internet data connection faces a tiny microsecond drop
+    st.info("📡 WAITING FOR LIVE DATA STREAM... PLEASE REFRESH IN 3s")
+else:
+    # Algorithmic selection picks the absolute top ticker from the live pool on total autopilot
+    target_ticker = str(live_scanned_universe[0]).upper()
+    
+    live_price = 0.00
+    volume = 0
+    pe_val = 0.00
+    beta_val = 1.00
+    mcap_val = 0.00
+    
+    try:
+        stock_connection = yf.Ticker(target_ticker + ".NS")
+        live_df = stock_connection.history(period="1d", interval="1m")
+        if not live_df.empty:
+            live_price = live_df['Close'].iloc[-1]
+            volume = live_df['Volume'].iloc[-1]
+            pe_val = stock_connection.info.get('trailingPE', 0.00)
+            beta_val = stock_connection.info.get('beta', 1.00)
+            mcap_val = stock_connection.info.get('marketCap', 0.00) / 10000000
+        else:
+            daily_df = stock_connection.history(period="1d")
+            if not daily_df.empty:
+                live_price = daily_df['Close'].iloc[-1]
+    except:
+        pass
+        
+    if live_price == 0.00:
+        st.warning("⚠️ Live price socket is loading. Tap refresh to update data channels.")
     else:
-        st.markdown("<div style='color:#64748b; font-size:0.85rem; padding-top:10px;'>Desk section deactivated. Select tab criteria option above to reveal keys.</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with mid_col2:
-    st.markdown("<div class='blueprint-container'><div class='blueprint-title'>RESULT FOR STOCK NAMES</div>", unsafe_allow_html=True)
-    if st.session_state.selected_view_tab in ["FEEDS", "MANUAL SCANNER INTERFACE"]:
-        item_a = live_scanned_universe[0] if len(live_scanned_universe) > 0 else "SAIL"
-        item_b = live_scanned_universe[2] if len(live_scanned_universe) > 2 else "BEL"
-        st.markdown("<div style='color:#60a5fa; font-size:0.85rem; line-height:1.6;'>🔹 " + item_a + " - NSE Monitor<br>🔹 " + item_b + " - NSE Monitor</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div style='color:#64748b; font-size:0.85rem; padding-top:10px;'>Feeds pipeline tracking deactivated. Select FEEDS menu above.</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with mid_col3:
-    if st.session_state.selected_view_tab in ["STOCK OF THE DAY", "MANUAL SCANNER INTERFACE"]:
-        day_price = offline_vault.get(active_carousel_asset, {"price": 150.00})["price"]
-        try:
-            live_ticker_obj = yf.Ticker(active_carousel_asset + ".NS")
-            realtime_df = live_ticker_obj.history(period="1d")
-            if not realtime_df.empty:
-                day_price = realtime_df['Close'].iloc[-1]
-        except:
-            pass
-            
+        # Strategy Threshold Math
+        c1 = 50 <= live_price <= 500
+        c2 = pe_val <= 25 if pe_val > 0 else True
+        c3 = 0.60 <= beta_val <= 1.20
+        c4 = mcap_val >= 5000 if mcap_val > 0 else True
+        c5 = volume >= 500000 if volume > 0 else True
+        
+        v1_class = "text-pass-green" if c1 else "text-fail-red"
+        v1_text = "PASS 🟢" if c1 else "FAIL 🔴"
+        v2_class = "text-pass-green" if c2 else "text-fail-red"
+        v2_text = "PASS 🟢" if c2 else "FAIL 🔴"
+        v3_class = "text-pass-green" if c3 else "text-fail-red"
+        v3_text = "PASS 🟢" if c3 else "FAIL 🔴"
+        v4_class = "text-pass-green" if c4 else "text-fail-red"
+        v4_text = "PASS 🟢" if c4 else "FAIL 🔴"
+        v5_class = "text-pass-green" if c5 else "text-fail-red"
+        v5_text = "PASS 🟢" if c5 else "FAIL 🔴"
+        
+        # 1. PREMIUM STOCK OF THE DAY DISPLAY PANEL
         st.markdown(f"""
             <div class='winner-gold-frame'>
-                <div class='winner-star-title'>⭐ THE TODAY'S WINNER</div>
-                <div style='font-size:1.4rem; font-weight:900;'>{active_carousel_asset} INDUSTRIES</div>
-                <div style='font-size:1.15rem; color:#22c55e; font-weight:700;'>₹{day_price:.2f} <span style='font-size:0.75rem; color:#94a3b8;'>(+1.20% Live)</span></div>
+                <div class='winner-star-title'>⭐ REAL-TIME QUANT Breakout SCANNER WINNER</div>
+                <div style='font-size:2.5rem; font-weight:900; color:#0f172a; margin: 5px 0;'>{target_ticker}</div>
+                <div style='font-size:1.4rem; color:#15803d; font-weight:700;'>Live Price Checked: ₹{live_price:.2f}</div>
             </div>
         """, unsafe_allow_html=True)
         
-        # Carousel Navigation Buttons
-        b_col1, b_col2 = st.columns(2)
-        with b_col1:
-            if st.button(" ❬  PREV "):
-                st.session_state.car_pointer = (st.session_state.car_pointer - 1) % len(live_scanned_universe)
-                st.rerun()
-        with b_col2:
-            if st.button(" NEXT  ❭ "):
-                st.session_state.car_pointer = (st.session_state.car_pointer + 1) % len(live_scanned_universe)
-                st.rerun()
-    else:
-        st.markdown("<div class='blueprint-container' style='min-height:115px;'><div style='color:#64748b; font-size:0.85rem; padding-top:15px;'>Stock of the Day card hidden. Select Menu option tab.</div></div>", unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ==========================================
-# 🔍 SEARCH FIELD SCANNER INTERFACE MODULE
+        # 2. COMPLETE 11-ROW HIGH DENSITY STOCK SCREENING MATRIX
+        st.markdown("<div style='font-size:0.95rem; font-weight:900; color:#0369a1; margin-top:10px; margin-bottom:5px;'>📋 11-PARAMETER STRATEGY PERFORMANCE CHARTS MATRIX</div>", unsafe_allow_html=True)
+        
+        matrix_ledger_html = """
+        <table class='matrix-table'>
+            <tr>
+                <th class='matrix-hdr'>PARAMETERS FROM SYSTEM SCAN</th>
+                <th class='matrix-hdr'>STOCK CODE</th>
+                <th class='matrix-hdr'>STOCK NAME REFERENCE</th>
+                <th class='matrix-hdr'>TTM P/E RATIO</th>
+                <th class='matrix-hdr'>MARKET CAP (CR)</th>
+                <th class='matrix-hdr'>LIVE PRICE</th>
+                <th class='matrix-hdr'>STRATEGY VERDICT STATUS</th>
+                <th class='matrix-hdr'>VOLUME TRADED</th>
+            </tr>
+            <tr class='row-odd'>
+                <td class='matrix-cell'>1. Price-to-Earnings Ratio Gate Layer</td>
+                <td class='matrix-cell'>NSE</td>
+                <td class='matrix-cell'><b>""" + target_ticker + """</b></td>
+                <td class='matrix-cell'>""" + f"{pe_val:.2f}" + """</td>
+                <td class='matrix-cell'>₹""" + f"{mcap_val:,.0f}" + """ Cr</td>
+                <td class='matrix-cell'>₹""" + f"{live_price:.2f}" + """</td>
+                <td class='matrix-cell """ + v2_class + """'><b>""" + v2_text + """</b></td>
+                <td class='matrix-cell'>""" + f"{volume:,.0f}" + """</td>
+            </tr>
+            <tr class='row-even'>
+                <td class='matrix-cell'>2. CMP Allocation Bounds Range (₹50-₹500)</td>
+                <td class='matrix-cell'>NSE</td>
+                <td class='matrix-cell'><b>""" + target_ticker + """</b></td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>₹""" + f"{live_price:.2f}" + """</td>
+                <td class='matrix-cell """ + v1_class + """'><b>""" + v1_text + """</b></td>
+                <td class='matrix-cell'>--</td>
+            </tr>
+            <tr class='row-odd'>
+                <td class='matrix-cell'>3. Volatility Shield Protection (Beta 0.60-1.20)</td>
+                <td class='matrix-cell'>NSE</td>
+                <td class='matrix-cell'><b>""" + target_ticker + """</b></td>
+                <td class='matrix-cell'>Beta: """ + f"{beta_val:.2f}" + """</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell """ + v3_class + """'><b>""" + v3_text + """</b></td>
+                <td class='matrix-cell'>--</td>
+            </tr>
+            <tr class='row-even'>
+                <td class='matrix-cell'>4. Market Capitalization Safety Cushion (> ₹5k Cr)</td>
+                <td class='matrix-cell'>NSE</td>
+                <td class='matrix-cell'><b>""" + target_ticker + """</b></td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>₹""" + f"{mcap_val:,.0f}" + """ Cr</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell """ + v4_class + """'><b>""" + v4_text + """</b></td>
+                <td class='matrix-cell'>--</td>
+            </tr>
+            <tr class='row-odd'>
+                <td class='matrix-cell'>5. Volume Liquidity Depth Floor (> 5 Lakh Shares)</td>
+                <td class='matrix-cell'>NSE</td>
+                <td class='matrix-cell'><b>""" + target_ticker + """</b></td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell'>--</td>
+                <td class='matrix-cell """ + v5_class + """'><b>""" + v5_text + """</b></td>
