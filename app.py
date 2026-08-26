@@ -146,7 +146,7 @@ with mid_col2:
     st.markdown("<div class='blueprint-container'><div class='blueprint-title'>RESULT FOR STOCK NAMES</div>", unsafe_allow_html=True)
     if st.session_state.selected_view_tab in ["FEEDS", "MANUAL SCANNER INTERFACE"]:
         item_a = live_scanned_universe[0] if len(live_scanned_universe) > 0 else "SAIL"
-        item_b = live_scanned_universe[1] if len(live_scanned_universe) > 1 else "BEL"
+        item_b = live_scanned_universe[2] if len(live_scanned_universe) > 2 else "BEL"
         st.markdown("<div style='color:#60a5fa; font-size:0.85rem; line-height:1.6;'>🔹 " + item_a + " - NSE Monitor<br>🔹 " + item_b + " - NSE Monitor</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='color:#64748b; font-size:0.85rem;'>Feeds Offline</div>", unsafe_allow_html=True)
