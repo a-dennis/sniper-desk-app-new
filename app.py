@@ -1,4 +1,3 @@
-import io
 import math
 import time
 from datetime import datetime, timedelta
@@ -6,12 +5,11 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 
 
 # ============================================================
-# QUANTBREAKOUT
-# REAL-TIME NSE BREAKOUT SCANNER
+# QUANTBREAKOUT WINNER SCANNER
+# REAL-TIME NSE EQUITY SCANNER
 # ============================================================
 
 st.set_page_config(
@@ -23,8 +21,9 @@ st.set_page_config(
 
 
 # ============================================================
-# USER STRATEGY RULES
-# These are strategy rules, not market data.
+# STRATEGY SETTINGS
+# These are strategy rules only.
+# No stock name, stock price or market value is hardcoded.
 # ============================================================
 
 PE_MAX = 25.0
@@ -37,26 +36,20 @@ BETA_MAX = 1.20
 
 FREE_FLOAT_MCAP_MIN_CR = 5000.0
 
-VOLUME_MIN = 500_000
+VOLUME_MIN = 500000
 
 VOLUME_SURGE_MULTIPLIER = 2.0
+
+EMA_FAST = 9
+EMA_SLOW = 21
 
 CAPITAL = 15000.0
 RISK_PERCENT = 0.008
 SL_MULTIPLIER = 1.5
 TP_MULTIPLIER = 3.0
 
-EMA_FAST = 9
-EMA_SLOW = 21
-
-# Technical candidates evaluated after live quote filtering.
 TECHNICAL_CANDIDATES = 20
-
-# Fundamental statistics are expensive API calls,
-# so only the strongest technical candidates are checked.
-FUNDAMENTAL_CANDIDATES = 12
-
-QUOTE_BATCH_SIZE = 1000
+FUNDAMENTAL_CANDIDATES = 10
 
 DHAN_BASE_URL = "https://api.dhan.co/v2"
 
@@ -69,7 +62,7 @@ TWELVE_DATA_URL = "https://api.twelvedata.com"
 
 
 # ============================================================
-# STREAMLIT SECRETS
+# SECRETS
 # ============================================================
 
 DHAN_CLIENT_ID = st.secrets.get(
@@ -89,17 +82,6 @@ TWELVE_DATA_API_KEY = st.secrets.get(
 
 
 # ============================================================
-# AUTO REFRESH
-# 15 seconds
-# ============================================================
-
-st_autorefresh(
-    interval=15_000,
-    key="quantbreakout_refresh",
-)
-
-
-# ============================================================
 # CSS
 # ============================================================
 
@@ -111,9 +93,7 @@ st.markdown(
 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap'
 );
 
-html,
-body,
-[class*="css"] {
+html, body, [class*="css"] {
     font-family: Inter, sans-serif !important;
 }
 
@@ -122,7 +102,7 @@ body,
         radial-gradient(
             circle at 20% 0%,
             rgba(255,255,255,0.95),
-            transparent 32%
+            transparent 35%
         ),
         linear-gradient(
             180deg,
@@ -133,8 +113,8 @@ body,
 
 .block-container {
     max-width: 1500px;
-    padding-top: 18px;
-    padding-bottom: 35px;
+    padding-top: 14px;
+    padding-bottom: 30px;
 }
 
 header {
@@ -152,100 +132,56 @@ footer {
 
 /* HEADER */
 
-.top-header {
+.qb-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
 
-    padding: 12px 16px;
-
-    background: rgba(255,255,255,0.88);
+    background: rgba(255,255,255,0.92);
 
     border: 1px solid #bae6fd;
 
-    border-radius: 15px;
+    border-radius: 16px;
 
-    box-shadow:
-        0 7px 25px
-        rgba(15,23,42,0.08);
+    padding: 12px 16px;
 
     margin-bottom: 12px;
+
+    box-shadow:
+        0 8px 28px rgba(15,23,42,0.08);
 }
 
-.brand {
-    font-size: 1.45rem;
+.qb-brand {
+    font-size: 1.5rem;
     font-weight: 900;
     color: #0f172a;
 }
 
-.brand-icon {
+.qb-brand span {
     color: #0284c7;
 }
 
-.subtitle {
-    color: #475569;
-    font-size: 0.68rem;
+.qb-subtitle {
+    color: #64748b;
+    font-size: 0.66rem;
     font-weight: 700;
     margin-top: 2px;
 }
 
-.live-pill {
+.qb-live {
     background: #dcfce7;
-    color: #15803d;
-
     border: 1px solid #86efac;
-
-    border-radius: 999px;
-
-    padding: 6px 12px;
-
-    font-size: 0.68rem;
-    font-weight: 900;
-}
-
-
-/* STAT CARDS */
-
-.stat-card {
-    background: rgba(255,255,255,0.90);
-
-    border:
-        1px solid
-        #bae6fd;
-
-    border-radius: 12px;
-
-    padding: 11px;
-
-    min-height: 75px;
-
-    box-shadow:
-        0 5px 18px
-        rgba(15,23,42,0.06);
-}
-
-.stat-title {
-    color: #64748b;
-    font-size: 0.61rem;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-
-.stat-value {
-    color: #0f172a;
-    font-size: 1.15rem;
-    font-weight: 900;
-    margin-top: 4px;
-}
-
-.stat-green {
     color: #15803d;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 0.65rem;
+    font-weight: 900;
 }
 
 
 /* WINNER */
 
-.winner {
+.qb-winner {
     background:
         linear-gradient(
             135deg,
@@ -254,76 +190,141 @@ footer {
             #fff7b0
         );
 
-    border:
-        2px solid
-        #ca8a04;
+    border: 3px solid #ca8a04;
 
-    border-radius: 18px;
+    border-radius: 19px;
 
-    padding: 20px 15px;
+    padding: 19px;
 
     text-align: center;
 
     box-shadow:
-        0 12px 35px
-        rgba(202,138,4,0.18);
+        0 14px 38px rgba(202,138,4,0.18);
+
+    margin-bottom: 12px;
 }
 
-.winner-badge {
+.qb-winner-badge {
     display: inline-block;
 
     background: #ca8a04;
 
     color: white;
 
-    border-radius: 999px;
+    padding: 6px 14px;
 
-    padding: 6px 13px;
+    border-radius: 999px;
 
     font-size: 0.67rem;
 
     font-weight: 900;
 }
 
-.winner-symbol {
+.qb-winner-symbol {
     color: #0f172a;
 
     font-size:
-        clamp(
-            2.7rem,
-            7vw,
-            4.5rem
-        );
+        clamp(2.5rem, 7vw, 4.6rem);
 
     font-weight: 900;
 
     line-height: 1;
 
-    margin-top: 8px;
+    margin-top: 10px;
 }
 
-.winner-name {
+.qb-winner-name {
     color: #475569;
 
     font-size: 0.78rem;
 
     font-weight: 800;
 
-    margin-top: 7px;
+    margin-top: 6px;
 }
 
-.winner-price {
+.qb-winner-price {
     color: #15803d;
 
-    font-size: 1.8rem;
+    font-size: 1.9rem;
 
     font-weight: 900;
 
     margin-top: 9px;
 }
 
-.winner-change {
-    font-size: 0.8rem;
+.qb-winner-change {
+    color: #475569;
+
+    font-size: 0.75rem;
+
+    font-weight: 800;
+
+    margin-top: 3px;
+}
+
+
+/* PANEL */
+
+.qb-panel {
+    background: rgba(255,255,255,0.78);
+
+    border: 1px solid #bae6fd;
+
+    border-radius: 14px;
+
+    padding: 13px;
+
+    margin-top: 12px;
+
+    box-shadow:
+        0 6px 22px rgba(15,23,42,0.06);
+}
+
+.qb-panel-title {
+    color: #075985;
+
+    font-size: 0.78rem;
+
+    font-weight: 900;
+
+    letter-spacing: 0.5px;
+
+    margin-bottom: 9px;
+}
+
+
+/* METRIC CARDS */
+
+.qb-card {
+    background: rgba(255,255,255,0.90);
+
+    border: 1px solid #bae6fd;
+
+    border-radius: 12px;
+
+    padding: 10px;
+
+    min-height: 72px;
+
+    box-shadow:
+        0 5px 17px rgba(15,23,42,0.05);
+}
+
+.qb-card-label {
+    color: #64748b;
+
+    font-size: 0.58rem;
+
+    font-weight: 900;
+
+    text-transform: uppercase;
+}
+
+.qb-card-value {
+    color: #0f172a;
+
+    font-size: 1.12rem;
 
     font-weight: 900;
 
@@ -331,63 +332,24 @@ footer {
 }
 
 
-/* PANELS */
+/* TABLE */
 
-.panel {
-    background:
-        rgba(255,255,255,0.72);
-
-    border:
-        1px solid
-        #bae6fd;
-
-    border-radius: 14px;
-
-    padding: 14px;
-
-    margin-top: 12px;
-
-    box-shadow:
-        0 6px 20px
-        rgba(15,23,42,0.06);
-}
-
-.panel-title {
-    color: #0c4a6e;
-
-    font-size: 0.78rem;
-
-    font-weight: 900;
-
-    letter-spacing: 0.7px;
-
-    margin-bottom: 11px;
-}
-
-
-/* MATRIX */
-
-.matrix-wrap {
+.qb-table-wrap {
     width: 100%;
-
     overflow-x: auto;
-
-    border-radius: 10px;
 }
 
-.matrix {
+.qb-table {
     width: 100%;
-
-    min-width: 780px;
+    min-width: 820px;
 
     border-collapse: collapse;
 
-    font-size: 0.72rem;
+    font-size: 0.71rem;
 }
 
-.matrix th {
+.qb-table th {
     background: #075985;
-
     color: #ffffff;
 
     padding: 9px;
@@ -397,42 +359,35 @@ footer {
     white-space: nowrap;
 }
 
-.matrix td {
+.qb-table td {
     color: #0f172a;
 
-    background: rgba(255,255,255,0.72);
+    background: rgba(255,255,255,0.82);
 
-    border-bottom:
-        1px solid
-        #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
 
     padding: 8px;
-
-    vertical-align: middle;
 }
 
-.pass {
+.qb-pass {
     color: #15803d;
-
     font-weight: 900;
 }
 
-.fail {
+.qb-fail {
     color: #b91c1c;
-
     font-weight: 900;
 }
 
-.na {
+.qb-na {
     color: #64748b;
-
     font-weight: 800;
 }
 
 
 /* POSITION */
 
-.position {
+.qb-position {
     background:
         linear-gradient(
             135deg,
@@ -440,28 +395,26 @@ footer {
             #e0f2fe
         );
 
-    border:
-        2px solid
-        #0284c7;
+    border: 2px solid #0284c7;
 
     border-radius: 14px;
 
-    padding: 14px;
+    padding: 13px;
 
     margin-top: 12px;
 }
 
-.position-title {
+.qb-position-title {
     color: #075985;
 
     font-size: 0.78rem;
 
     font-weight: 900;
 
-    margin-bottom: 10px;
+    margin-bottom: 9px;
 }
 
-.position-grid {
+.qb-position-grid {
     display: grid;
 
     grid-template-columns:
@@ -470,53 +423,30 @@ footer {
     gap: 9px;
 }
 
-.position-item {
-    background:
-        rgba(255,255,255,0.72);
+.qb-position-item {
+    background: rgba(255,255,255,0.78);
 
     border-radius: 10px;
 
-    padding: 11px;
+    padding: 10px;
 }
 
-.position-label {
+.qb-position-label {
     color: #64748b;
 
-    font-size: 0.6rem;
+    font-size: 0.57rem;
 
-    font-weight: 800;
+    font-weight: 900;
 }
 
-.position-value {
+.qb-position-value {
     color: #0f172a;
 
-    font-size: 1rem;
+    font-size: 0.95rem;
 
     font-weight: 900;
 
     margin-top: 5px;
-}
-
-
-/* FOOTER */
-
-.footer-bar {
-    margin-top: 13px;
-
-    background:
-        rgba(255,255,255,0.58);
-
-    border-radius: 10px;
-
-    padding: 9px;
-
-    color: #475569;
-
-    font-size: 0.63rem;
-
-    font-weight: 700;
-
-    text-align: center;
 }
 
 
@@ -529,45 +459,50 @@ footer {
             8px 10px 20px !important;
     }
 
-    .top-header {
-        padding: 9px;
+    .qb-header {
+        padding: 9px 10px;
     }
 
-    .brand {
+    .qb-brand {
         font-size: 1.05rem;
     }
 
-    .subtitle {
-        font-size: 0.58rem;
+    .qb-subtitle {
+        font-size: 0.54rem;
     }
 
-    .winner {
-        padding: 17px 9px;
+    .qb-live {
+        font-size: 0.56rem;
+        padding: 5px 8px;
     }
 
-    .winner-symbol {
+    .qb-winner {
+        padding: 15px 8px;
+    }
+
+    .qb-winner-symbol {
         font-size: 2.8rem;
     }
 
-    .winner-price {
-        font-size: 1.4rem;
+    .qb-winner-price {
+        font-size: 1.5rem;
     }
 
-    .panel {
+    .qb-panel {
         padding: 10px;
     }
 
-    .position-grid {
+    .qb-position-grid {
         grid-template-columns:
             repeat(2, 1fr);
     }
 
-    .matrix {
-        font-size: 0.64rem;
+    .qb-table {
+        font-size: 0.62rem;
     }
 
-    .matrix th,
-    .matrix td {
+    .qb-table th,
+    .qb-table td {
         padding: 6px;
     }
 }
@@ -579,46 +514,10 @@ footer {
 
 
 # ============================================================
-# CREDENTIAL CHECK
-# ============================================================
-
-if not DHAN_CLIENT_ID or not DHAN_ACCESS_TOKEN:
-
-    st.markdown(
-        """
-<div class="winner">
-
-<div class="winner-badge">
-⚡ QUANTBREAKOUT
-</div>
-
-<div class="winner-symbol">
-LIVE CONNECTION REQUIRED
-</div>
-
-<div class="winner-name">
-DhanHQ credentials are not configured.
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    st.warning(
-        "Add DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN "
-        "to Streamlit Secrets."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# API HEADERS
+# API HELPERS
 # ============================================================
 
 def dhan_headers():
-
     return {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -627,8 +526,22 @@ def dhan_headers():
     }
 
 
+def api_error(response):
+    try:
+        data = response.json()
+
+        return (
+            data.get("errorMessage")
+            or data.get("message")
+            or str(data)
+        )
+
+    except Exception:
+        return response.text[:500]
+
+
 # ============================================================
-# LOAD DHAN INSTRUMENT MASTER
+# INSTRUMENT MASTER
 # ============================================================
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -636,77 +549,169 @@ def load_instrument_master():
 
     response = requests.get(
         DHAN_INSTRUMENT_URL,
-        timeout=40,
+        timeout=45,
     )
 
     response.raise_for_status()
 
     return pd.read_csv(
-        io.BytesIO(response.content),
+        response.url,
         low_memory=False,
     )
+
+
+def choose_column(df, possible):
+
+    for name in possible:
+
+        if name in df.columns:
+            return name
+
+    return None
 
 
 def get_nse_equities():
 
     df = load_instrument_master()
 
-    required = [
-        "EXCH_ID",
-        "SEGMENT",
-        "INSTRUMENT",
-        "SECURITY_ID",
-        "SYMBOL_NAME",
-        "DISPLAY_NAME",
-    ]
+    exchange_col = choose_column(
+        df,
+        [
+            "EXCH_ID",
+            "SEM_EXM_EXCH_ID",
+        ],
+    )
 
-    missing = [
-        x
-        for x in required
-        if x not in df.columns
-    ]
+    segment_col = choose_column(
+        df,
+        [
+            "SEGMENT",
+            "SEM_SEGMENT",
+        ],
+    )
 
-    if missing:
+    instrument_col = choose_column(
+        df,
+        [
+            "INSTRUMENT",
+            "SEM_INSTRUMENT_NAME",
+        ],
+    )
+
+    security_col = choose_column(
+        df,
+        [
+            "SECURITY_ID",
+            "SEM_SMST_SECURITY_ID",
+        ],
+    )
+
+    symbol_col = choose_column(
+        df,
+        [
+            "SYMBOL_NAME",
+            "SEM_CUSTOM_SYMBOL",
+            "SM_SYMBOL_NAME",
+        ],
+    )
+
+    display_col = choose_column(
+        df,
+        [
+            "DISPLAY_NAME",
+            "SEM_CUSTOM_SYMBOL",
+            "SYMBOL_NAME",
+        ],
+    )
+
+    if not exchange_col:
         raise RuntimeError(
-            f"Instrument master missing columns: {missing}"
+            "Could not find NSE exchange column "
+            "in Dhan instrument master."
+        )
+
+    if not security_col:
+        raise RuntimeError(
+            "Could not find Security ID column "
+            "in Dhan instrument master."
+        )
+
+    if not symbol_col:
+        raise RuntimeError(
+            "Could not find symbol column "
+            "in Dhan instrument master."
         )
 
     result = df[
-        (
-            df["EXCH_ID"]
+        df[exchange_col]
+        .astype(str)
+        .str.upper()
+        .eq("NSE")
+    ].copy()
+
+    if segment_col:
+
+        segment = (
+            result[segment_col]
             .astype(str)
             .str.upper()
-            == "NSE"
         )
-        &
-        (
-            df["SEGMENT"]
+
+        result = result[
+            segment.str.contains(
+                "EQUITY|NSE_EQ|E",
+                regex=True,
+                na=False,
+            )
+        ]
+
+    if instrument_col:
+
+        instrument = (
+            result[instrument_col]
             .astype(str)
             .str.upper()
-            == "E"
         )
-        &
-        (
-            df["INSTRUMENT"]
-            .astype(str)
-            .str.upper()
-            == "EQUITY"
+
+        equity_mask = (
+            instrument.eq("EQUITY")
+            | instrument.eq("EQUITY SHARES")
+            | instrument.str.contains(
+                "EQUITY",
+                na=False,
+            )
+        )
+
+        filtered = result[equity_mask]
+
+        if not filtered.empty:
+            result = filtered
+
+    result = result[
+        [security_col, symbol_col]
+        + (
+            [display_col]
+            if display_col
+            and display_col not in [
+                security_col,
+                symbol_col,
+            ]
+            else []
         )
     ].copy()
 
-    result = result[
-        [
-            "SECURITY_ID",
-            "SYMBOL_NAME",
-            "DISPLAY_NAME",
-        ]
-    ]
-
-    result.columns = [
+    columns = [
         "security_id",
         "symbol",
-        "name",
     ]
+
+    if len(result.columns) == 3:
+        columns.append("name")
+
+    result.columns = columns
+
+    if "name" not in result.columns:
+        result["name"] = result["symbol"]
 
     result["security_id"] = pd.to_numeric(
         result["security_id"],
@@ -727,6 +732,7 @@ def get_nse_equities():
         result["symbol"]
         .astype(str)
         .str.strip()
+        .str.upper()
     )
 
     result["name"] = (
@@ -735,13 +741,23 @@ def get_nse_equities():
         .str.strip()
     )
 
-    return result.drop_duplicates(
-        "security_id"
-    ).reset_index(drop=True)
+    result = result[
+        result["symbol"].ne("")
+        &
+        result["symbol"].ne("NAN")
+    ]
+
+    return (
+        result
+        .drop_duplicates(
+            subset=["security_id"]
+        )
+        .reset_index(drop=True)
+    )
 
 
 # ============================================================
-# CHUNK LIST
+# CHUNK
 # ============================================================
 
 def chunks(values, size):
@@ -758,21 +774,23 @@ def chunks(values, size):
 
 
 # ============================================================
-# LIVE DHAN QUOTES
+# LIVE QUOTES
 # ============================================================
 
-def fetch_quotes(security_ids):
+def fetch_live_quotes(
+    security_ids
+):
 
-    records = []
+    output = []
 
     batches = list(
         chunks(
             security_ids,
-            QUOTE_BATCH_SIZE,
+            1000,
         )
     )
 
-    for batch_number, batch in enumerate(
+    for batch_index, batch in enumerate(
         batches
     ):
 
@@ -787,33 +805,32 @@ def fetch_quotes(security_ids):
             f"{DHAN_BASE_URL}/marketfeed/quote",
             headers=dhan_headers(),
             json=payload,
-            timeout=25,
+            timeout=30,
         )
 
         if response.status_code != 200:
 
             raise RuntimeError(
-                f"Dhan quote error "
-                f"{response.status_code}: "
-                f"{response.text[:400]}"
+                "Dhan quote API failed: "
+                + api_error(response)
             )
 
         body = response.json()
 
-        nse = (
+        data = (
             body
             .get("data", {})
             .get("NSE_EQ", {})
         )
 
-        for security_id, item in nse.items():
+        for security_id, item in data.items():
 
             ohlc = item.get(
                 "ohlc",
                 {},
             )
 
-            records.append(
+            output.append(
                 {
                     "security_id":
                         str(security_id),
@@ -838,17 +855,17 @@ def fetch_quotes(security_ids):
                             "net_change"
                         ),
 
-                    "day_open":
+                    "open":
                         ohlc.get(
                             "open"
                         ),
 
-                    "day_high":
+                    "high":
                         ohlc.get(
                             "high"
                         ),
 
-                    "day_low":
+                    "low":
                         ohlc.get(
                             "low"
                         ),
@@ -860,41 +877,18 @@ def fetch_quotes(security_ids):
                 }
             )
 
-        if batch_number < len(batches) - 1:
+        if (
+            batch_index
+            < len(batches) - 1
+        ):
 
             time.sleep(1.05)
 
-    if not records:
-
-        return pd.DataFrame()
-
-    result = pd.DataFrame(
-        records
-    )
-
-    numeric = [
-        "last_price",
-        "volume",
-        "average_price",
-        "net_change",
-        "day_open",
-        "day_high",
-        "day_low",
-        "previous_close",
-    ]
-
-    for column in numeric:
-
-        result[column] = pd.to_numeric(
-            result[column],
-            errors="coerce",
-        )
-
-    return result
+    return pd.DataFrame(output)
 
 
 # ============================================================
-# LIVE 1-MINUTE CANDLES
+# 1-MINUTE DATA
 # ============================================================
 
 def fetch_intraday(
@@ -938,22 +932,20 @@ def fetch_intraday(
         f"{DHAN_BASE_URL}/charts/intraday",
         headers=dhan_headers(),
         json=payload,
-        timeout=25,
+        timeout=30,
     )
 
     if response.status_code != 200:
-
         return pd.DataFrame()
 
     body = response.json()
 
-    closes = body.get(
+    close = body.get(
         "close",
-        [],
+        []
     )
 
-    if not closes:
-
+    if not close:
         return pd.DataFrame()
 
     result = pd.DataFrame(
@@ -961,37 +953,37 @@ def fetch_intraday(
             "timestamp":
                 body.get(
                     "timestamp",
-                    [],
+                    []
                 ),
 
             "open":
                 body.get(
                     "open",
-                    [],
+                    []
                 ),
 
             "high":
                 body.get(
                     "high",
-                    [],
+                    []
                 ),
 
             "low":
                 body.get(
                     "low",
-                    [],
+                    []
                 ),
 
             "close":
                 body.get(
                     "close",
-                    [],
+                    []
                 ),
 
             "volume":
                 body.get(
                     "volume",
-                    [],
+                    []
                 ),
         }
     )
@@ -1009,13 +1001,22 @@ def fetch_intraday(
             errors="coerce",
         )
 
-    return result.dropna().reset_index(
-        drop=True
+    return (
+        result
+        .dropna(
+            subset=[
+                "high",
+                "low",
+                "close",
+                "volume",
+            ]
+        )
+        .reset_index(drop=True)
     )
 
 
 # ============================================================
-# TWELVE DATA FUNDAMENTALS
+# FUNDAMENTALS
 # ============================================================
 
 @st.cache_data(
@@ -1023,14 +1024,15 @@ def fetch_intraday(
     show_spinner=False,
 )
 def fetch_fundamentals(
-    symbol,
+    symbol
 ):
 
     if not TWELVE_DATA_API_KEY:
 
         return {
-            "available":
-                False
+            "available": False,
+            "reason":
+                "TWELVE_DATA_API_KEY not configured",
         }
 
     try:
@@ -1047,56 +1049,54 @@ def fetch_fundamentals(
                 "apikey":
                     TWELVE_DATA_API_KEY,
             },
-            timeout=20,
+            timeout=25,
         )
 
         if response.status_code != 200:
 
             return {
-                "available":
-                    False
+                "available": False,
+                "reason":
+                    api_error(response),
             }
 
         data = response.json()
 
-        if (
-            "statistics"
-            not in data
-        ):
-
-            return {
-                "available":
-                    False
-            }
-
-        stats = data.get(
+        statistics = data.get(
             "statistics",
             {}
         )
 
-        valuations = stats.get(
+        if not statistics:
+
+            return {
+                "available": False,
+                "reason":
+                    "No statistics returned",
+            }
+
+        valuations = statistics.get(
             "valuations_metrics",
             {}
         )
 
-        balance = stats.get(
-            "balance_sheet",
-            {}
-        )
-
-        stock_stats = stats.get(
+        stock_statistics = statistics.get(
             "stock_statistics",
             {}
         )
 
-        price_summary = stats.get(
+        price_summary = statistics.get(
             "stock_price_summary",
             {}
         )
 
+        balance_sheet = statistics.get(
+            "balance_sheet",
+            {}
+        )
+
         return {
-            "available":
-                True,
+            "available": True,
 
             "pe":
                 valuations.get(
@@ -1104,7 +1104,7 @@ def fetch_fundamentals(
                 ),
 
             "float_shares":
-                stock_stats.get(
+                stock_statistics.get(
                     "float_shares"
                 ),
 
@@ -1114,16 +1114,16 @@ def fetch_fundamentals(
                 ),
 
             "debt_equity":
-                balance.get(
+                balance_sheet.get(
                     "total_debt_to_equity_mrq"
                 ),
         }
 
-    except Exception:
+    except Exception as error:
 
         return {
-            "available":
-                False
+            "available": False,
+            "reason": str(error),
         }
 
 
@@ -1136,7 +1136,6 @@ def calculate_vwap(
 ):
 
     if candles.empty:
-
         return None
 
     typical_price = (
@@ -1147,26 +1146,25 @@ def calculate_vwap(
 
     volume = candles["volume"]
 
-    if volume.sum() <= 0:
+    total_volume = volume.sum()
 
+    if total_volume <= 0:
         return None
 
     return float(
         (
-            typical_price
-            * volume
+            typical_price * volume
         ).sum()
-        / volume.sum()
+        / total_volume
     )
 
 
 def calculate_ema(
     candles,
-    period,
+    period
 ):
 
     if len(candles) < period:
-
         return None
 
     return float(
@@ -1185,22 +1183,20 @@ def calculate_volume_ratio(
 ):
 
     if len(candles) < 21:
-
         return None
 
-    average = (
+    average_volume = (
         candles["volume"]
         .iloc[-21:-1]
         .mean()
     )
 
-    if average <= 0:
-
+    if average_volume <= 0:
         return None
 
     return float(
         candles["volume"].iloc[-1]
-        / average
+        / average_volume
     )
 
 
@@ -1209,7 +1205,6 @@ def calculate_supertrend(
 ):
 
     if len(candles) < 20:
-
         return None
 
     period = 10
@@ -1220,7 +1215,7 @@ def calculate_supertrend(
         .shift(1)
     )
 
-    tr = pd.concat(
+    true_range = pd.concat(
         [
             candles["high"]
             - candles["low"],
@@ -1239,7 +1234,7 @@ def calculate_supertrend(
     ).max(axis=1)
 
     atr = (
-        tr
+        true_range
         .rolling(period)
         .mean()
     )
@@ -1249,27 +1244,27 @@ def calculate_supertrend(
         + candles["low"]
     ) / 2
 
-    upper = (
+    upper_band = (
         hl2
         + multiplier * atr
     )
 
-    lower = (
+    lower_band = (
         hl2
         - multiplier * atr
     )
 
-    close = candles["close"]
+    if pd.isna(
+        lower_band.iloc[-1]
+    ):
+        return None
 
-    # Simplified trend test:
-    # current close above lower band and
-    # above previous close.
     return bool(
-        close.iloc[-1]
-        > lower.iloc[-1]
+        candles["close"].iloc[-1]
+        > lower_band.iloc[-1]
         and
-        close.iloc[-1]
-        >= close.iloc[-2]
+        candles["close"].iloc[-1]
+        >= candles["close"].iloc[-2]
     )
 
 
@@ -1278,23 +1273,24 @@ def calculate_momentum(
 ):
 
     if len(candles) < 6:
-
         return None
 
-    previous = float(
+    old_price = float(
         candles["close"].iloc[-6]
     )
 
-    current = float(
+    current_price = float(
         candles["close"].iloc[-1]
     )
 
-    if previous <= 0:
-
+    if old_price <= 0:
         return None
 
     return (
-        (current / previous) - 1
+        (
+            current_price
+            / old_price
+        ) - 1
     ) * 100
 
 
@@ -1302,7 +1298,7 @@ def calculate_momentum(
 # POSITION SIZER
 # ============================================================
 
-def position_size(
+def calculate_position(
     price
 ):
 
@@ -1314,12 +1310,12 @@ def position_size(
         price * RISK_PERCENT
     )
 
-    sl = (
+    stop_loss = (
         price
         - risk_unit * SL_MULTIPLIER
     )
 
-    tp = (
+    take_profit = (
         price
         + risk_unit * TP_MULTIPLIER
     )
@@ -1327,8 +1323,8 @@ def position_size(
     return (
         shares,
         risk_unit,
-        sl,
-        tp,
+        stop_loss,
+        take_profit,
     )
 
 
@@ -1336,41 +1332,41 @@ def position_size(
 # VERDICT
 # ============================================================
 
-def status_html(
-    value
+def verdict_html(
+    verdict
 ):
 
-    if value is True:
+    if verdict is True:
 
         return (
-            '<span class="pass">'
+            '<span class="qb-pass">'
             '🟢 PASS'
             '</span>'
         )
 
-    if value is False:
+    if verdict is False:
 
         return (
-            '<span class="fail">'
+            '<span class="qb-fail">'
             '🔴 FAIL'
             '</span>'
         )
 
     return (
-        '<span class="na">'
-        '⚪ DATA UNAVAILABLE'
+        '<span class="qb-na">'
+        '⚪ DATA N/A'
         '</span>'
     )
 
 
 # ============================================================
-# EVALUATE ONE STOCK
+# EVALUATE STOCK
 # ============================================================
 
 def evaluate_stock(
     stock,
     candles,
-    fundamentals,
+    fundamentals
 ):
 
     price = float(
@@ -1381,18 +1377,34 @@ def evaluate_stock(
         stock["volume"]
     )
 
+    pe = fundamentals.get(
+        "pe"
+    )
+
+    beta = fundamentals.get(
+        "beta"
+    )
+
+    float_shares = fundamentals.get(
+        "float_shares"
+    )
+
+    debt_equity = fundamentals.get(
+        "debt_equity"
+    )
+
     vwap = calculate_vwap(
         candles
     )
 
     ema9 = calculate_ema(
         candles,
-        9
+        EMA_FAST
     )
 
     ema21 = calculate_ema(
         candles,
-        21
+        EMA_SLOW
     )
 
     volume_ratio = (
@@ -1413,28 +1425,8 @@ def evaluate_stock(
         )
     )
 
-    pe = fundamentals.get(
-        "pe"
-    )
-
-    beta = fundamentals.get(
-        "beta"
-    )
-
-    float_shares = fundamentals.get(
-        "float_shares"
-    )
-
-    debt_equity = fundamentals.get(
-        "debt_equity"
-    )
-
-
-    # --------------------------------------------------------
-    # FREE FLOAT MARKET CAP
-    # ₹ Crores
-    # --------------------------------------------------------
-
+    # Free-float market cap:
+    # price × float shares / 1 crore
     if (
         float_shares is not None
         and
@@ -1444,275 +1436,227 @@ def evaluate_stock(
         free_float_mcap_cr = (
             price
             * float(float_shares)
-            / 10_000_000
+            / 10000000
         )
 
     else:
 
         free_float_mcap_cr = None
 
-
     rows = []
 
-
-    # 1 P/E
-
-    if pe is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Price-to-Earnings Ratio ≤ 25",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Fundamental data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Price-to-Earnings Ratio ≤ 25",
-
-                "verdict":
-                    float(pe) <= PE_MAX,
-
-                "metric":
-                    f"{float(pe):.2f}",
-            }
-        )
-
-
-    # 2 CMP
+    # --------------------------------------------------------
+    # 1. P/E
+    # --------------------------------------------------------
 
     rows.append(
         {
             "parameter":
-                "CMP between ₹50 and ₹500",
+                "TTM P/E ≤ 25",
 
             "verdict":
-                CMP_MIN
-                <= price
-                <= CMP_MAX,
+                (
+                    float(pe) <= PE_MAX
+                    if pe is not None
+                    else None
+                ),
+
+            "metric":
+                (
+                    f"{float(pe):.2f}"
+                    if pe is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 2. CMP
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "CMP ₹50 – ₹500",
+
+            "verdict":
+                (
+                    CMP_MIN
+                    <= price
+                    <= CMP_MAX
+                ),
 
             "metric":
                 f"₹{price:,.2f}",
         }
     )
 
-
-    # 3 Beta
-
-    if beta is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Beta between 0.60 and 1.20",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Fundamental data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Beta between 0.60 and 1.20",
-
-                "verdict":
-                    BETA_MIN
-                    <= float(beta)
-                    <= BETA_MAX,
-
-                "metric":
-                    f"{float(beta):.2f}",
-            }
-        )
-
-
-    # 4 Free float market cap
-
-    if free_float_mcap_cr is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Free-Float Market Cap ≥ ₹5,000 Cr",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Float data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Free-Float Market Cap ≥ ₹5,000 Cr",
-
-                "verdict":
-                    free_float_mcap_cr
-                    >= FREE_FLOAT_MCAP_MIN_CR,
-
-                "metric":
-                    (
-                        f"₹{free_float_mcap_cr:,.0f} Cr"
-                    ),
-            }
-        )
-
-
-    # 5 Volume
+    # --------------------------------------------------------
+    # 3. Beta
+    # --------------------------------------------------------
 
     rows.append(
         {
             "parameter":
-                "Traded Volume ≥ 5 Lakh",
+                "Beta 0.60 – 1.20",
+
+            "verdict":
+                (
+                    BETA_MIN
+                    <= float(beta)
+                    <= BETA_MAX
+                    if beta is not None
+                    else None
+                ),
+
+            "metric":
+                (
+                    f"{float(beta):.2f}"
+                    if beta is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 4. Free float market cap
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "Free-Float Market Cap ≥ ₹5,000 Cr",
+
+            "verdict":
+                (
+                    free_float_mcap_cr
+                    >= FREE_FLOAT_MCAP_MIN_CR
+                    if free_float_mcap_cr is not None
+                    else None
+                ),
+
+            "metric":
+                (
+                    f"₹{free_float_mcap_cr:,.0f} Cr"
+                    if free_float_mcap_cr is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 5. Volume
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "Volume ≥ 5 Lakh Shares",
 
             "verdict":
                 volume >= VOLUME_MIN,
 
             "metric":
-                f"{volume:,.0f} shares",
+                f"{volume:,.0f}",
         }
     )
 
-
-    # 6 Debt / Equity
-
-    if debt_equity is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Debt-to-Equity",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Fundamental data unavailable",
-            }
-        )
-
-    else:
-
-        # User's original strategy did not specify
-        # a numerical D/E threshold.
-        # Therefore display the real value but
-        # do not invent a pass/fail threshold.
-
-        rows.append(
-            {
-                "parameter":
-                    "Debt-to-Equity",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    f"{float(debt_equity):.2f}"
-                    " — threshold required",
-            }
-        )
-
-
-    # 7 VWAP
-
-    if vwap is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Price above VWAP",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Candle data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Price above VWAP",
-
-                "verdict":
-                    price >= vwap,
-
-                "metric":
-                    (
-                        f"Price ₹{price:,.2f} | "
-                        f"VWAP ₹{vwap:,.4f}"
-                    ),
-            }
-        )
-
-
-    # 8 EMA
-
-    if (
-        ema9 is None
-        or ema21 is None
-    ):
-
-        rows.append(
-            {
-                "parameter":
-                    "EMA 9 above EMA 21",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Candle data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "EMA 9 above EMA 21",
-
-                "verdict":
-                    ema9 > ema21,
-
-                "metric":
-                    (
-                        f"9 EMA ₹{ema9:,.2f} | "
-                        f"21 EMA ₹{ema21:,.2f}"
-                    ),
-            }
-        )
-
-
-    # 9 Supertrend
+    # --------------------------------------------------------
+    # 6. Debt / Equity
+    # --------------------------------------------------------
 
     rows.append(
         {
             "parameter":
-                "Supertrend bullish",
+                "Debt-to-Equity",
+
+            "verdict":
+                None,
+
+            "metric":
+                (
+                    f"{float(debt_equity):.2f} "
+                    "(threshold not defined)"
+                    if debt_equity is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 7. VWAP
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "Price ≥ Intraday VWAP",
+
+            "verdict":
+                (
+                    price >= vwap
+                    if vwap is not None
+                    else None
+                ),
+
+            "metric":
+                (
+                    f"Price ₹{price:,.2f} | "
+                    f"VWAP ₹{vwap:,.4f}"
+                    if vwap is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 8. EMA 9 / 21
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "EMA 9 > EMA 21",
+
+            "verdict":
+                (
+                    ema9 > ema21
+                    if (
+                        ema9 is not None
+                        and
+                        ema21 is not None
+                    )
+                    else None
+                ),
+
+            "metric":
+                (
+                    f"9 EMA ₹{ema9:,.2f} | "
+                    f"21 EMA ₹{ema21:,.2f}"
+                    if (
+                        ema9 is not None
+                        and
+                        ema21 is not None
+                    )
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
+
+    # --------------------------------------------------------
+    # 9. Supertrend
+    # --------------------------------------------------------
+
+    rows.append(
+        {
+            "parameter":
+                "Supertrend Bullish",
 
             "verdict":
                 supertrend,
@@ -1720,97 +1664,82 @@ def evaluate_stock(
             "metric":
                 (
                     "Bullish"
-                    if supertrend
+                    if supertrend is True
                     else
                     "Bearish"
-                    if supertrend is not None
+                    if supertrend is False
                     else
                     "Unavailable"
                 ),
         }
     )
 
+    # --------------------------------------------------------
+    # 10. Volume surge
+    # --------------------------------------------------------
 
-    # 10 Volume surge
+    rows.append(
+        {
+            "parameter":
+                "Current Volume ≥ 2× Average",
 
-    if volume_ratio is None:
-
-        rows.append(
-            {
-                "parameter":
-                    "Volume ≥ 2× 20-bar average",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Candle data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Volume ≥ 2× 20-bar average",
-
-                "verdict":
+            "verdict":
+                (
                     volume_ratio
-                    >= VOLUME_SURGE_MULTIPLIER,
+                    >= VOLUME_SURGE_MULTIPLIER
+                    if volume_ratio is not None
+                    else None
+                ),
 
-                "metric":
-                    f"{volume_ratio:.2f}× average",
-            }
-        )
+            "metric":
+                (
+                    f"{volume_ratio:.2f}×"
+                    if volume_ratio is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
 
+    # --------------------------------------------------------
+    # 11. Momentum
+    # --------------------------------------------------------
 
-    # 11 Momentum
+    rows.append(
+        {
+            "parameter":
+                "Positive Intraday Momentum",
 
-    if momentum is None:
+            "verdict":
+                (
+                    momentum > 0
+                    if momentum is not None
+                    else None
+                ),
 
-        rows.append(
-            {
-                "parameter":
-                    "Positive intraday momentum",
-
-                "verdict":
-                    None,
-
-                "metric":
-                    "Candle data unavailable",
-            }
-        )
-
-    else:
-
-        rows.append(
-            {
-                "parameter":
-                    "Positive intraday momentum",
-
-                "verdict":
-                    momentum > 0,
-
-                "metric":
-                    f"{momentum:+.3f}% / 5 bars",
-            }
-        )
-
+            "metric":
+                (
+                    f"{momentum:+.3f}% / 5 bars"
+                    if momentum is not None
+                    else
+                    "Unavailable"
+                ),
+        }
+    )
 
     passes = sum(
-        x["verdict"] is True
-        for x in rows
+        row["verdict"] is True
+        for row in rows
     )
 
     fails = sum(
-        x["verdict"] is False
-        for x in rows
+        row["verdict"] is False
+        for row in rows
     )
 
     unavailable = sum(
-        x["verdict"] is None
-        for x in rows
+        row["verdict"] is None
+        for row in rows
     )
 
     score = (
@@ -1818,44 +1747,257 @@ def evaluate_stock(
     ) * 100
 
     return {
-        "rows":
-            rows,
-
-        "passes":
-            passes,
-
-        "fails":
-            fails,
-
-        "unavailable":
-            unavailable,
-
-        "score":
-            score,
+        "rows": rows,
+        "passes": passes,
+        "fails": fails,
+        "unavailable": unavailable,
+        "score": score,
     }
 
 
 # ============================================================
-# LOAD UNIVERSE
+# SCANNER
 # ============================================================
 
-try:
+def run_scanner():
 
-    universe = (
-        get_nse_equities()
+    universe = get_nse_equities()
+
+    quotes = fetch_live_quotes(
+        universe["security_id"].tolist()
     )
 
-except Exception as error:
+    if quotes.empty:
+        raise RuntimeError(
+            "Dhan returned no live quote data."
+        )
 
-    st.error(
-        "Unable to load Dhan's NSE instrument master."
+    market = universe.merge(
+        quotes,
+        on="security_id",
+        how="inner",
     )
 
-    st.code(
-        str(error)
+    numeric_columns = [
+        "last_price",
+        "volume",
+        "net_change",
+        "open",
+        "high",
+        "low",
+        "previous_close",
+    ]
+
+    for column in numeric_columns:
+
+        market[column] = pd.to_numeric(
+            market[column],
+            errors="coerce",
+        )
+
+    market = market.dropna(
+        subset=[
+            "last_price",
+            "volume",
+        ]
     )
 
-    st.stop()
+    # --------------------------------------------------------
+    # Live price and volume filter
+    # --------------------------------------------------------
+
+    candidates = market[
+        (
+            market["last_price"]
+            >= CMP_MIN
+        )
+        &
+        (
+            market["last_price"]
+            <= CMP_MAX
+        )
+        &
+        (
+            market["volume"]
+            >= VOLUME_MIN
+        )
+    ].copy()
+
+    if candidates.empty:
+
+        return {
+            "universe": universe,
+            "market": market,
+            "results": [],
+        }
+
+    # Highest volume stocks are checked first.
+    candidates = (
+        candidates
+        .sort_values(
+            "volume",
+            ascending=False,
+        )
+        .head(
+            TECHNICAL_CANDIDATES
+        )
+    )
+
+    technical_results = []
+
+    for _, stock in candidates.iterrows():
+
+        try:
+
+            candles = fetch_intraday(
+                stock["security_id"]
+            )
+
+            if candles.empty:
+                continue
+
+            vwap = calculate_vwap(
+                candles
+            )
+
+            ema9 = calculate_ema(
+                candles,
+                EMA_FAST
+            )
+
+            ema21 = calculate_ema(
+                candles,
+                EMA_SLOW
+            )
+
+            volume_ratio = (
+                calculate_volume_ratio(
+                    candles
+                )
+            )
+
+            supertrend = (
+                calculate_supertrend(
+                    candles
+                )
+            )
+
+            momentum = (
+                calculate_momentum(
+                    candles
+                )
+            )
+
+            technical_score = 0
+
+            if (
+                vwap is not None
+                and
+                float(stock["last_price"])
+                >= vwap
+            ):
+                technical_score += 1
+
+            if (
+                ema9 is not None
+                and
+                ema21 is not None
+                and
+                ema9 > ema21
+            ):
+                technical_score += 1
+
+            if supertrend is True:
+                technical_score += 1
+
+            if (
+                volume_ratio is not None
+                and
+                volume_ratio >= 2
+            ):
+                technical_score += 1
+
+            if (
+                momentum is not None
+                and
+                momentum > 0
+            ):
+                technical_score += 1
+
+            technical_results.append(
+                {
+                    "stock": stock,
+                    "candles": candles,
+                    "technical_score":
+                        technical_score,
+                }
+            )
+
+        except Exception:
+            continue
+
+    technical_results.sort(
+        key=lambda x: (
+            x["technical_score"],
+            float(
+                x["stock"]["volume"]
+            ),
+        ),
+        reverse=True,
+    )
+
+    # --------------------------------------------------------
+    # Fundamental evaluation
+    # --------------------------------------------------------
+
+    final_results = []
+
+    for item in technical_results[
+        :FUNDAMENTAL_CANDIDATES
+    ]:
+
+        stock = item["stock"]
+
+        fundamentals = (
+            fetch_fundamentals(
+                stock["symbol"]
+            )
+        )
+
+        evaluation = evaluate_stock(
+            stock,
+            item["candles"],
+            fundamentals,
+        )
+
+        final_results.append(
+            {
+                "stock": stock,
+                "candles": item["candles"],
+                "fundamentals":
+                    fundamentals,
+                "evaluation":
+                    evaluation,
+            }
+        )
+
+    final_results.sort(
+        key=lambda x: (
+            x["evaluation"]["passes"],
+            -x["evaluation"]["fails"],
+            x["evaluation"]["score"],
+            float(
+                x["stock"]["volume"]
+            ),
+        ),
+        reverse=True,
+    )
+
+    return {
+        "universe": universe,
+        "market": market,
+        "results": final_results,
+    }
 
 
 # ============================================================
@@ -1864,22 +2006,21 @@ except Exception as error:
 
 st.markdown(
     """
-<div class="top-header">
+<div class="qb-header">
 
 <div>
 
-<div class="brand">
-<span class="brand-icon">⚡</span>
-QUANTBREAKOUT
+<div class="qb-brand">
+<span>⚡</span> QUANTbreakout
 </div>
 
-<div class="subtitle">
-Real-Time NSE Scanner • DhanHQ Market Data
+<div class="qb-subtitle">
+REAL-TIME NSE MOMENTUM & BREAKOUT SCANNER
 </div>
 
 </div>
 
-<div class="live-pill">
+<div class="qb-live">
 ● LIVE ENGINE
 </div>
 
@@ -1890,505 +2031,260 @@ Real-Time NSE Scanner • DhanHQ Market Data
 
 
 # ============================================================
-# LIVE QUOTES
+# CREDENTIAL SCREEN
 # ============================================================
 
-try:
+if not DHAN_CLIENT_ID or not DHAN_ACCESS_TOKEN:
 
-    quotes = fetch_quotes(
-        universe["security_id"].tolist()
+    st.markdown(
+        """
+<div class="qb-winner">
+
+<div class="qb-winner-badge">
+⚡ QUANTBREAKOUT
+</div>
+
+<div class="qb-winner-symbol">
+LIVE CONNECTION REQUIRED
+</div>
+
+<div class="qb-winner-name">
+DhanHQ credentials are missing.
+</div>
+
+</div>
+""",
+        unsafe_allow_html=True,
     )
-
-except Exception as error:
 
     st.error(
-        "Dhan live market connection failed."
-    )
-
-    st.code(
-        str(error)
+        "Configure DHAN_CLIENT_ID and "
+        "DHAN_ACCESS_TOKEN in Streamlit Secrets."
     )
 
     st.stop()
 
 
-if quotes.empty:
-
-    st.warning(
-        "Dhan returned no live quote data."
-    )
-
-    st.stop()
-
-
-market = universe.merge(
-    quotes,
-    on="security_id",
-    how="inner",
-)
-
-market = market.dropna(
-    subset=[
-        "last_price",
-        "volume",
-    ]
-)
-
-
 # ============================================================
-# LIVE PRE-FILTER
+# NATIVE STREAMLIT AUTO REFRESH
+#
+# No streamlit_autorefresh package required.
 # ============================================================
 
-candidates = market[
-    (
-        market["last_price"]
-        >= CMP_MIN
-    )
-    &
-    (
-        market["last_price"]
-        <= CMP_MAX
-    )
-    &
-    (
-        market["volume"]
-        >= VOLUME_MIN
-    )
-].copy()
+@st.fragment(run_every="15s")
+def live_terminal():
 
-
-if candidates.empty:
-
-    st.warning(
-        "No live NSE stock currently meets "
-        "the ₹50–₹500 price and 5-lakh "
-        "volume pre-filter."
-    )
-
-    st.stop()
-
-
-# Highest live volume first.
-candidates = (
-    candidates
-    .sort_values(
-        "volume",
-        ascending=False,
-    )
-    .head(
-        TECHNICAL_CANDIDATES
-    )
-)
-
-
-# ============================================================
-# TECHNICAL SCAN
-# ============================================================
-
-technical_results = []
-
-progress = st.progress(
-    0,
-    text="Scanning live 1-minute candles..."
-)
-
-total = len(candidates)
-
-for number, (
-    _,
-    stock,
-) in enumerate(
-    candidates.iterrows(),
-    start=1,
-):
+    scan_started = time.time()
 
     try:
 
-        candles = fetch_intraday(
-            stock["security_id"]
+        with st.spinner(
+            "Connecting to live NSE market data..."
+        ):
+
+            data = run_scanner()
+
+    except Exception as error:
+
+        st.error(
+            "LIVE DATA CONNECTION ERROR"
         )
 
-        if candles.empty:
-
-            continue
-
-        vwap = calculate_vwap(
-            candles
+        st.code(
+            str(error)
         )
 
-        ema9 = calculate_ema(
-            candles,
-            9
+        st.info(
+            "Check your Dhan credentials, "
+            "Dhan API access and market status."
         )
 
-        ema21 = calculate_ema(
-            candles,
-            21
+        return
+
+    universe = data["universe"]
+
+    market = data["market"]
+
+    results = data["results"]
+
+    # --------------------------------------------------------
+    # No candidates
+    # --------------------------------------------------------
+
+    if not results:
+
+        st.warning(
+            "No stock currently satisfies the "
+            "live ₹50–₹500 and 5-lakh volume filter."
         )
 
-        volume_ratio = (
-            calculate_volume_ratio(
-                candles
-            )
+        st.caption(
+            "The scanner is still connected to "
+            f"{len(market):,} live NSE instruments."
         )
 
-        supertrend = (
-            calculate_supertrend(
-                candles
-            )
-        )
+        return
 
-        momentum = (
-            calculate_momentum(
-                candles
-            )
-        )
+    # --------------------------------------------------------
+    # WINNER
+    # --------------------------------------------------------
 
-        technical_score = 0
+    winner = results[0]
 
-        technical_score += (
-            1
-            if vwap is not None
-            and float(stock["last_price"])
-            >= vwap
-            else 0
-        )
+    stock = winner["stock"]
 
-        technical_score += (
-            1
-            if ema9 is not None
-            and ema21 is not None
-            and ema9 > ema21
-            else 0
-        )
+    evaluation = winner["evaluation"]
 
-        technical_score += (
-            1
-            if supertrend is True
-            else 0
-        )
-
-        technical_score += (
-            1
-            if volume_ratio is not None
-            and volume_ratio >= 2
-            else 0
-        )
-
-        technical_score += (
-            1
-            if momentum is not None
-            and momentum > 0
-            else 0
-        )
-
-        technical_results.append(
-            {
-                "stock":
-                    stock,
-
-                "candles":
-                    candles,
-
-                "technical_score":
-                    technical_score,
-            }
-        )
-
-    except Exception:
-        pass
-
-    progress.progress(
-        number / total,
-        text=(
-            f"Live technical scan "
-            f"{number}/{total}"
-        ),
+    price = float(
+        stock["last_price"]
     )
 
-    time.sleep(0.22)
+    change = stock["net_change"]
 
-progress.empty()
+    if pd.notna(change):
 
-
-if not technical_results:
-
-    st.warning(
-        "No live technical candle data "
-        "was returned."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# RANK TECHNICAL RESULTS
-# ============================================================
-
-technical_results.sort(
-    key=lambda item: (
-        item["technical_score"],
-        float(
-            item["stock"]["volume"]
-        ),
-    ),
-    reverse=True,
-)
-
-
-# ============================================================
-# FUNDAMENTAL EVALUATION
-# ============================================================
-
-final_results = []
-
-fundamental_pool = technical_results[
-    :FUNDAMENTAL_CANDIDATES
-]
-
-
-for item in fundamental_pool:
-
-    stock = item["stock"]
-
-    candles = item["candles"]
-
-    fundamentals = (
-        fetch_fundamentals(
-            stock["symbol"]
+        change_text = (
+            f"{float(change):+.2f}"
         )
-    )
 
-    evaluation = evaluate_stock(
-        stock,
-        candles,
-        fundamentals,
-    )
+    else:
 
-    final_results.append(
-        {
-            "stock":
-                stock,
+        change_text = "—"
 
-            "evaluation":
-                evaluation,
+    # --------------------------------------------------------
+    # MARKET CARDS
+    # --------------------------------------------------------
 
-            "candles":
-                candles,
-        }
-    )
+    c1, c2, c3, c4, c5 = st.columns(5)
 
+    with c1:
 
-if not final_results:
-
-    st.stop()
-
-
-# ============================================================
-# WINNER
-# ============================================================
-
-final_results.sort(
-    key=lambda item: (
-        item["evaluation"]["passes"],
-        -item["evaluation"]["fails"],
-        item["evaluation"]["score"],
-        float(
-            item["stock"]["volume"]
-        ),
-    ),
-    reverse=True,
-)
-
-winner = final_results[0]
-
-winner_stock = winner["stock"]
-
-winner_eval = winner["evaluation"]
-
-
-# ============================================================
-# TOP STATISTICS
-# ============================================================
-
-c1, c2, c3, c4, c5 = st.columns(5)
-
-with c1:
-
-    st.markdown(
-        f"""
-<div class="stat-card">
-<div class="stat-title">
-Market Status
+        st.markdown(
+            f"""
+<div class="qb-card">
+<div class="qb-card-label">
+NSE INSTRUMENTS
 </div>
-<div class="stat-value stat-green">
-● LIVE
-</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-with c2:
-
-    st.markdown(
-        f"""
-<div class="stat-card">
-<div class="stat-title">
-Last Updated
-</div>
-<div class="stat-value">
-{datetime.now().strftime("%H:%M:%S")}
-</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-with c3:
-
-    st.markdown(
-        f"""
-<div class="stat-card">
-<div class="stat-title">
-NSE Universe
-</div>
-<div class="stat-value">
+<div class="qb-card-value">
 {len(universe):,}
 </div>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
-with c4:
+    with c2:
 
-    st.markdown(
-        f"""
-<div class="stat-card">
-<div class="stat-title">
-Live Quotes
+        st.markdown(
+            f"""
+<div class="qb-card">
+<div class="qb-card-label">
+LIVE QUOTES
 </div>
-<div class="stat-value">
+<div class="qb-card-value">
 {len(market):,}
 </div>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
-with c5:
+    with c3:
 
-    st.markdown(
-        f"""
-<div class="stat-card">
-<div class="stat-title">
-Technical Candidates
+        st.markdown(
+            f"""
+<div class="qb-card">
+<div class="qb-card-label">
+WINNER PASS
 </div>
-<div class="stat-value">
-{len(technical_results)}
+<div class="qb-card-value">
+{evaluation["passes"]}/11
 </div>
 </div>
 """,
-        unsafe_allow_html=True,
-    )
+            unsafe_allow_html=True,
+        )
 
+    with c4:
 
-# ============================================================
-# WINNER CARD
-# ============================================================
+        st.markdown(
+            f"""
+<div class="qb-card">
+<div class="qb-card-label">
+SCORE
+</div>
+<div class="qb-card-value">
+{evaluation["score"]:.1f}%
+</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
-price = float(
-    winner_stock["last_price"]
-)
+    with c5:
 
-change = winner_stock["net_change"]
+        st.markdown(
+            f"""
+<div class="qb-card">
+<div class="qb-card-label">
+UPDATED
+</div>
+<div class="qb-card-value">
+{datetime.now().strftime("%H:%M:%S")}
+</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
-change_text = (
-    f"{float(change):+.2f}"
-    if pd.notna(change)
-    else "—"
-)
+    # --------------------------------------------------------
+    # WINNER CARD
+    # --------------------------------------------------------
 
-st.markdown(
-    f"""
-<div class="winner">
+    st.markdown(
+        f"""
+<div class="qb-winner">
 
-<div class="winner-badge">
+<div class="qb-winner-badge">
 ⭐ REAL-TIME QUANT BREAKOUT WINNER
 </div>
 
-<div class="winner-symbol">
-{winner_stock["symbol"]}
+<div class="qb-winner-symbol">
+{stock["symbol"]}
 </div>
 
-<div class="winner-name">
-{winner_stock["name"]}
+<div class="qb-winner-name">
+{stock["name"]}
 </div>
 
-<div class="winner-price">
+<div class="qb-winner-price">
 ₹{price:,.2f}
 </div>
 
-<div class="winner-change">
+<div class="qb-winner-change">
 Live Change: {change_text}
 </div>
 
 </div>
 """,
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# SUMMARY
-# ============================================================
-
-s1, s2, s3, s4 = st.columns(4)
-
-with s1:
-
-    st.metric(
-        "PASS CONDITIONS",
-        f'{winner_eval["passes"]} / 11',
+        unsafe_allow_html=True,
     )
 
-with s2:
+    # --------------------------------------------------------
+    # MATRIX
+    # --------------------------------------------------------
 
-    st.metric(
-        "FAIL CONDITIONS",
-        f'{winner_eval["fails"]} / 11',
-    )
+    st.markdown(
+        """
+<div class="qb-panel">
 
-with s3:
-
-    st.metric(
-        "DATA UNAVAILABLE",
-        f'{winner_eval["unavailable"]} / 11',
-    )
-
-with s4:
-
-    st.metric(
-        "MATRIX SCORE",
-        f'{winner_eval["score"]:.1f}%',
-    )
-
-
-# ============================================================
-# MATRIX
-# ============================================================
-
-matrix_html = """
-<div class="panel">
-
-<div class="panel-title">
-📊 11-PARAMETER STRATEGY MATRIX
+<div class="qb-panel-title">
+📊 11-PARAMETER STRATEGY PERFORMANCE GRID
 </div>
 
-<div class="matrix-wrap">
+<div class="qb-table-wrap">
 
-<table class="matrix">
+<table class="qb-table">
 
 <thead>
 
@@ -2404,117 +2300,108 @@ matrix_html = """
 </thead>
 
 <tbody>
-"""
+""",
+        unsafe_allow_html=True,
+    )
 
-for index, row in enumerate(
-    winner_eval["rows"],
-    start=1,
-):
+    table_rows = ""
 
-    matrix_html += f"""
+    for index, row in enumerate(
+        evaluation["rows"],
+        start=1,
+    ):
+
+        table_rows += f"""
 <tr>
 
-<td>
-{index}
-</td>
+<td>{index}</td>
 
-<td>
-{row["parameter"]}
-</td>
+<td>{row["parameter"]}</td>
 
-<td>
-{winner_stock["symbol"]}
-</td>
+<td>{stock["symbol"]}</td>
 
-<td>
-{winner_stock["name"]}
-</td>
+<td>{stock["name"]}</td>
 
-<td>
-{status_html(row["verdict"])}
-</td>
+<td>{verdict_html(row["verdict"])}</td>
 
-<td>
-{row["metric"]}
-</td>
+<td>{row["metric"]}</td>
 
 </tr>
 """
 
-matrix_html += """
+    st.markdown(
+        table_rows
+        + """
 </tbody>
 </table>
+
 </div>
 </div>
-"""
+""",
+        unsafe_allow_html=True,
+    )
 
-st.markdown(
-    matrix_html,
-    unsafe_allow_html=True,
-)
+    # --------------------------------------------------------
+    # POSITION CALCULATOR
+    # --------------------------------------------------------
 
+    shares, risk_unit, sl, tp = (
+        calculate_position(price)
+    )
 
-# ============================================================
-# POSITION SIZER
-# ============================================================
+    st.markdown(
+        f"""
+<div class="qb-position">
 
-shares, risk_unit, sl, tp = (
-    position_size(price)
-)
-
-st.markdown(
-    f"""
-<div class="position">
-
-<div class="position-title">
-🧮 POSITION SIZING — ₹15,000 CAPITAL
+<div class="qb-position-title">
+🧮 FIXED STRATEGY RISK BRACKET — ₹15,000 CAPITAL
 </div>
 
-<div class="position-grid">
+<div class="qb-position-grid">
 
-<div class="position-item">
+<div class="qb-position-item">
 
-<div class="position-label">
+<div class="qb-position-label">
 TARGET POSITION
 </div>
 
-<div class="position-value">
+<div class="qb-position-value">
 BUY EXACTLY {shares} SHARES
 </div>
 
 </div>
 
-<div class="position-item">
+<div class="qb-position-item">
 
-<div class="position-label">
-SYSTEM RISK UNIT
+<div class="qb-position-label">
+RISK UNIT — 0.8%
 </div>
 
-<div class="position-value">
+<div class="qb-position-value">
 ₹{risk_unit:,.2f}
 </div>
 
 </div>
 
-<div class="position-item">
+<div class="qb-position-item">
 
-<div class="position-label">
-🔒 AUTOMATED STOP LOSS
+<div class="qb-position-label">
+🔒 AUTOMATED SL FLOOR
 </div>
 
-<div class="position-value">
+<div class="qb-position-value">
 ₹{sl:,.2f}
 </div>
 
 </div>
 
-<div class="position-item">
+<div class="qb-position-item">
 
-<div class="position-label">
-🎯 AUTOMATED TAKE PROFIT
+<div class="qb-position-label">
+🎯 AUTOMATED TP CEILING
 </div>
 
-<div class="position-value">
+<div class="qb-position-value">
 ₹{tp:,.2f}
 </div>
 
@@ -2524,136 +2411,284 @@ SYSTEM RISK UNIT
 
 </div>
 """,
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# MANUAL CHECK
-# ============================================================
-
-st.markdown(
-    """
-<div class="panel">
-
-<div class="panel-title">
-🔍 MANUAL CHECK OVERRIDE
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-manual_symbol = st.text_input(
-    "Enter NSE symbol",
-    placeholder="Enter any NSE equity symbol",
-    label_visibility="collapsed",
-)
-
-if manual_symbol:
-
-    symbol = (
-        manual_symbol
-        .strip()
-        .upper()
+        unsafe_allow_html=True,
     )
 
-    found = market[
-        market["symbol"]
-        .astype(str)
-        .str.upper()
-        .eq(symbol)
-    ]
+    # --------------------------------------------------------
+    # MANUAL CHECK
+    # --------------------------------------------------------
 
-    if found.empty:
+    st.markdown(
+        """
+<div class="qb-panel">
+
+<div class="qb-panel-title">
+🔍 MANUAL CHECK OVERRIDE
+</div>
+
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    manual_symbol = st.text_input(
+        "Manual NSE symbol",
+        placeholder="Example: INFY",
+        key="manual_symbol",
+    )
+
+    if manual_symbol:
+
+        symbol = (
+            manual_symbol
+            .strip()
+            .upper()
+        )
+
+        matching = market[
+            market["symbol"]
+            .eq(symbol)
+        ]
+
+        if matching.empty:
+
+            # Search the live Dhan universe
+            # rather than using hardcoded symbols.
+
+            matching = universe[
+                universe["symbol"]
+                .eq(symbol)
+            ]
+
+            if matching.empty:
+
+                st.error(
+                    f"{symbol} was not found "
+                    "in Dhan's current NSE instrument master."
+                )
+
+            else:
+
+                manual_stock = matching.iloc[0]
+
+                # Fetch real-time quote specifically
+                manual_quotes = (
+                    fetch_live_quotes(
+                        [
+                            manual_stock[
+                                "security_id"
+                            ]
+                        ]
+                    )
+                )
+
+                if manual_quotes.empty:
+
+                    st.error(
+                        "Dhan did not return "
+                        "live quote data for "
+                        f"{symbol}."
+                    )
+
+                else:
+
+                    manual_stock = (
+                        manual_stock
+                        .to_frame()
+                        .T
+                        .merge(
+                            manual_quotes,
+                            on="security_id",
+                            how="inner",
+                        )
+                        .iloc[0]
+                    )
+
+                    show_manual_result(
+                        manual_stock
+                    )
+
+        else:
+
+            manual_stock = (
+                matching.iloc[0]
+            )
+
+            show_manual_result(
+                manual_stock
+            )
+
+    # --------------------------------------------------------
+    # SCAN INFORMATION
+    # --------------------------------------------------------
+
+    elapsed = (
+        time.time()
+        - scan_started
+    )
+
+    st.caption(
+        "LIVE DhanHQ market snapshot • "
+        f"Scanner cycle: {elapsed:.1f}s • "
+        "Automatic refresh: 15 seconds"
+    )
+
+
+# ============================================================
+# MANUAL RESULT FUNCTION
+# ============================================================
+
+def show_manual_result(
+    stock
+):
+
+    with st.spinner(
+        "Loading live manual analysis..."
+    ):
+
+        candles = fetch_intraday(
+            stock["security_id"]
+        )
+
+        fundamentals = (
+            fetch_fundamentals(
+                stock["symbol"]
+            )
+        )
+
+    if candles.empty:
 
         st.warning(
-            "Symbol is not present in the "
-            "current Dhan NSE instrument master."
+            "Live 1-minute candle data "
+            "is currently unavailable for "
+            f"{stock['symbol']}."
         )
 
-    else:
+        return
 
-        manual_stock = (
-            found.iloc[0]
-        )
+    evaluation = evaluate_stock(
+        stock,
+        candles,
+        fundamentals,
+    )
 
-        with st.spinner(
-            "Loading live manual-check data..."
-        ):
+    price = float(
+        stock["last_price"]
+    )
 
-            manual_candles = (
-                fetch_intraday(
-                    manual_stock[
-                        "security_id"
-                    ]
-                )
-            )
+    st.success(
+        f"Live manual check completed: "
+        f"{stock['symbol']} @ ₹{price:,.2f}"
+    )
 
-            manual_fundamentals = (
-                fetch_fundamentals(
-                    manual_stock[
-                        "symbol"
-                    ]
-                )
-            )
+    html = """
+<div class="qb-table-wrap">
 
-        if not manual_candles.empty:
+<table class="qb-table">
 
-            manual_eval = (
-                evaluate_stock(
-                    manual_stock,
-                    manual_candles,
-                    manual_fundamentals,
-                )
-            )
-
-            st.success(
-                f"Live check completed for {symbol}"
-            )
-
-            manual_html = """
-<div class="matrix-wrap">
-<table class="matrix">
 <thead>
+
 <tr>
 <th>#</th>
 <th>PARAMETER</th>
 <th>VERDICT</th>
-<th>LIVE VALUE</th>
+<th>LIVE METRIC VALUE</th>
 </tr>
+
 </thead>
+
 <tbody>
 """
 
-            for i, row in enumerate(
-                manual_eval["rows"],
-                start=1,
-            ):
+    for index, row in enumerate(
+        evaluation["rows"],
+        start=1,
+    ):
 
-                manual_html += f"""
+        html += f"""
 <tr>
-<td>{i}</td>
+<td>{index}</td>
 <td>{row["parameter"]}</td>
-<td>{status_html(row["verdict"])}</td>
+<td>{verdict_html(row["verdict"])}</td>
 <td>{row["metric"]}</td>
 </tr>
 """
 
-            manual_html += """
+    html += """
 </tbody>
 </table>
+
 </div>
 """
 
-            st.markdown(
-                manual_html,
-                unsafe_allow_html=True,
-            )
+    st.markdown(
+        html,
+        unsafe_allow_html=True,
+    )
 
-st.markdown(
-    "</div>",
-    unsafe_allow_html=True,
-)
+    shares, risk_unit, sl, tp = (
+        calculate_position(price)
+    )
+
+    st.markdown(
+        f"""
+<div class="qb-position">
+
+<div class="qb-position-title">
+MANUAL POSITION CALCULATOR
+</div>
+
+<div class="qb-position-grid">
+
+<div class="qb-position-item">
+<div class="qb-position-label">
+SHARES
+</div>
+<div class="qb-position-value">
+{shares}
+</div>
+</div>
+
+<div class="qb-position-item">
+<div class="qb-position-label">
+RISK UNIT
+</div>
+<div class="qb-position-value">
+₹{risk_unit:,.2f}
+</div>
+</div>
+
+<div class="qb-position-item">
+<div class="qb-position-label">
+STOP LOSS
+</div>
+<div class="qb-position-value">
+₹{sl:,.2f}
+</div>
+</div>
+
+<div class="qb-position-item">
+<div class="qb-position-label">
+TAKE PROFIT
+</div>
+<div class="qb-position-value">
+₹{tp:,.2f}
+</div>
+</div>
+
+</div>
+
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# START TERMINAL
+# ============================================================
+
+live_terminal()
 
 
 # ============================================================
@@ -2661,21 +2696,15 @@ st.markdown(
 # ============================================================
 
 st.markdown(
-    f"""
-<div class="footer-bar">
-
-📡 DATA: DhanHQ Live Market Data
-&nbsp;&nbsp; • &nbsp;&nbsp;
-
-📊 FUNDAMENTALS: Twelve Data NSE Statistics
-&nbsp;&nbsp; • &nbsp;&nbsp;
-
-🔄 AUTO REFRESH: 15 seconds
-&nbsp;&nbsp; • &nbsp;&nbsp;
-
-🕒 SERVER TIME:
-{datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
-
+    """
+<div style="
+    text-align:center;
+    color:#64748b;
+    font-size:0.62rem;
+    font-weight:700;
+    margin-top:15px;
+">
+⚡ QUANTbreakout • Live market data powered by DhanHQ
 </div>
 """,
     unsafe_allow_html=True,
