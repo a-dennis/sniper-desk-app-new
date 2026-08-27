@@ -1,5 +1,6 @@
-streamlit==1.62.0
-streamlit-autorefresh==1.0.1
-pandas>=2.2,<3
-numpy>=2.0,<3
-requests>=2.32,<3
+streamlit>=1.37
+pandas>=2.2
+requests>=2.32
+pyotp>=2.9
+yfinance>=0.2.40
+git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2#egg=neo_api_client
