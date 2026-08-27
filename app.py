@@ -3,16 +3,15 @@ import math
 import time
 from datetime import datetime, timedelta
 
-import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 
 # ============================================================
 # QUANTBREAKOUT
-# REAL-TIME NSE SCANNER
-# DhanHQ Market Data
+# REAL-TIME NSE BREAKOUT SCANNER
 # ============================================================
 
 st.set_page_config(
@@ -24,8 +23,8 @@ st.set_page_config(
 
 
 # ============================================================
-# STRATEGY SETTINGS
-# These are strategy rules, NOT market data.
+# USER STRATEGY RULES
+# These are strategy rules, not market data.
 # ============================================================
 
 PE_MAX = 25.0
@@ -36,12 +35,9 @@ CMP_MAX = 500.0
 BETA_MIN = 0.60
 BETA_MAX = 1.20
 
-MARKET_CAP_MIN_CR = 5000.0
+FREE_FLOAT_MCAP_MIN_CR = 5000.0
 
 VOLUME_MIN = 500_000
-
-EMA_FAST = 9
-EMA_SLOW = 21
 
 VOLUME_SURGE_MULTIPLIER = 2.0
 
@@ -50,39 +46,61 @@ RISK_PERCENT = 0.008
 SL_MULTIPLIER = 1.5
 TP_MULTIPLIER = 3.0
 
-# Number of technically evaluated candidates.
-# Stocks themselves are NEVER hardcoded.
-MAX_TECHNICAL_CANDIDATES = 50
+EMA_FAST = 9
+EMA_SLOW = 21
 
-# Dhan market quote limit is 1000 instruments/request.
+# Technical candidates evaluated after live quote filtering.
+TECHNICAL_CANDIDATES = 20
+
+# Fundamental statistics are expensive API calls,
+# so only the strongest technical candidates are checked.
+FUNDAMENTAL_CANDIDATES = 12
+
 QUOTE_BATCH_SIZE = 1000
 
 DHAN_BASE_URL = "https://api.dhan.co/v2"
 
-INSTRUMENT_MASTER_URL = (
+DHAN_INSTRUMENT_URL = (
     "https://images.dhan.co/api-data/"
     "api-scrip-master-detailed.csv"
 )
 
+TWELVE_DATA_URL = "https://api.twelvedata.com"
+
 
 # ============================================================
-# DHAN CREDENTIALS
-# Store these in Streamlit Secrets.
+# STREAMLIT SECRETS
 # ============================================================
-
-DHAN_ACCESS_TOKEN = st.secrets.get(
-    "DHAN_ACCESS_TOKEN",
-    ""
-)
 
 DHAN_CLIENT_ID = st.secrets.get(
     "DHAN_CLIENT_ID",
     ""
 )
 
+DHAN_ACCESS_TOKEN = st.secrets.get(
+    "DHAN_ACCESS_TOKEN",
+    ""
+)
+
+TWELVE_DATA_API_KEY = st.secrets.get(
+    "TWELVE_DATA_API_KEY",
+    ""
+)
+
 
 # ============================================================
-# GLOBAL CSS
+# AUTO REFRESH
+# 15 seconds
+# ============================================================
+
+st_autorefresh(
+    interval=15_000,
+    key="quantbreakout_refresh",
+)
+
+
+# ============================================================
+# CSS
 # ============================================================
 
 st.markdown(
@@ -102,9 +120,9 @@ body,
 .stApp {
     background:
         radial-gradient(
-            circle at 15% 0%,
-            rgba(255,255,255,0.85),
-            transparent 30%
+            circle at 20% 0%,
+            rgba(255,255,255,0.95),
+            transparent 32%
         ),
         linear-gradient(
             180deg,
@@ -115,8 +133,12 @@ body,
 
 .block-container {
     max-width: 1500px;
-    padding-top: 12px;
-    padding-bottom: 30px;
+    padding-top: 18px;
+    padding-bottom: 35px;
+}
+
+header {
+    visibility: hidden;
 }
 
 #MainMenu {
@@ -127,75 +149,103 @@ footer {
     visibility: hidden;
 }
 
-header {
-    visibility: hidden;
-}
 
+/* HEADER */
 
-/* TOP HEADER */
-
-.topbar {
+.top-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
 
-    padding: 13px 17px;
+    padding: 12px 16px;
 
-    background: rgba(255,255,255,0.72);
+    background: rgba(255,255,255,0.88);
 
-    border:
-        1px solid
-        #0284c7;
+    border: 1px solid #bae6fd;
 
     border-radius: 15px;
 
-    margin-bottom: 12px;
-
     box-shadow:
-        0 8px 25px
-        rgba(2,132,199,0.10);
+        0 7px 25px
+        rgba(15,23,42,0.08);
+
+    margin-bottom: 12px;
 }
 
-.logo {
-    color: #075985;
-
-    font-size: 1.35rem;
-
+.brand {
+    font-size: 1.45rem;
     font-weight: 900;
-
-    letter-spacing: -0.5px;
-}
-
-.logo span {
     color: #0f172a;
 }
 
-.live-badge {
+.brand-icon {
+    color: #0284c7;
+}
+
+.subtitle {
+    color: #475569;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.live-pill {
     background: #dcfce7;
+    color: #15803d;
 
-    color: #166534;
-
-    border:
-        1px solid
-        #22c55e;
+    border: 1px solid #86efac;
 
     border-radius: 999px;
 
-    padding: 5px 11px;
+    padding: 6px 12px;
 
     font-size: 0.68rem;
-
     font-weight: 900;
+}
+
+
+/* STAT CARDS */
+
+.stat-card {
+    background: rgba(255,255,255,0.90);
+
+    border:
+        1px solid
+        #bae6fd;
+
+    border-radius: 12px;
+
+    padding: 11px;
+
+    min-height: 75px;
+
+    box-shadow:
+        0 5px 18px
+        rgba(15,23,42,0.06);
+}
+
+.stat-title {
+    color: #64748b;
+    font-size: 0.61rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.stat-value {
+    color: #0f172a;
+    font-size: 1.15rem;
+    font-weight: 900;
+    margin-top: 4px;
+}
+
+.stat-green {
+    color: #15803d;
 }
 
 
 /* WINNER */
 
 .winner {
-    text-align: center;
-
-    padding: 24px 12px;
-
     background:
         linear-gradient(
             135deg,
@@ -205,26 +255,34 @@ header {
         );
 
     border:
-        3px solid
+        2px solid
         #ca8a04;
 
     border-radius: 18px;
 
-    margin-bottom: 12px;
+    padding: 20px 15px;
+
+    text-align: center;
 
     box-shadow:
         0 12px 35px
         rgba(202,138,4,0.18);
 }
 
-.winner-label {
-    color: #854d0e;
+.winner-badge {
+    display: inline-block;
 
-    font-size: 0.75rem;
+    background: #ca8a04;
+
+    color: white;
+
+    border-radius: 999px;
+
+    padding: 6px 13px;
+
+    font-size: 0.67rem;
 
     font-weight: 900;
-
-    letter-spacing: 1.4px;
 }
 
 .winner-symbol {
@@ -232,14 +290,24 @@ header {
 
     font-size:
         clamp(
-            2.6rem,
-            8vw,
-            5rem
+            2.7rem,
+            7vw,
+            4.5rem
         );
 
     font-weight: 900;
 
     line-height: 1;
+
+    margin-top: 8px;
+}
+
+.winner-name {
+    color: #475569;
+
+    font-size: 0.78rem;
+
+    font-weight: 800;
 
     margin-top: 7px;
 }
@@ -247,21 +315,19 @@ header {
 .winner-price {
     color: #15803d;
 
-    font-size: 1.55rem;
+    font-size: 1.8rem;
 
     font-weight: 900;
 
-    margin-top: 10px;
+    margin-top: 9px;
 }
 
-.winner-meta {
-    color: #475569;
+.winner-change {
+    font-size: 0.8rem;
 
-    font-size: 0.75rem;
+    font-weight: 900;
 
-    font-weight: 700;
-
-    margin-top: 5px;
+    margin-top: 4px;
 }
 
 
@@ -269,41 +335,39 @@ header {
 
 .panel {
     background:
-        rgba(186,230,253,0.78);
+        rgba(255,255,255,0.72);
 
     border:
         1px solid
-        #0284c7;
+        #bae6fd;
 
     border-radius: 14px;
 
     padding: 14px;
 
-    margin-bottom: 12px;
+    margin-top: 12px;
 
     box-shadow:
-        0 6px 18px
-        rgba(2,132,199,0.08);
+        0 6px 20px
+        rgba(15,23,42,0.06);
 }
 
 .panel-title {
-    color: #075985;
+    color: #0c4a6e;
 
     font-size: 0.78rem;
 
     font-weight: 900;
 
-    letter-spacing: 0.9px;
+    letter-spacing: 0.7px;
 
-    text-transform: uppercase;
-
-    margin-bottom: 10px;
+    margin-bottom: 11px;
 }
 
 
 /* MATRIX */
 
-.table-wrap {
+.matrix-wrap {
     width: 100%;
 
     overflow-x: auto;
@@ -314,21 +378,11 @@ header {
 .matrix {
     width: 100%;
 
-    min-width: 720px;
+    min-width: 780px;
 
-    border-collapse: separate;
+    border-collapse: collapse;
 
-    border-spacing: 0;
-
-    border:
-        1px solid
-        #0284c7;
-
-    border-radius: 10px;
-
-    overflow: hidden;
-
-    font-size: 0.74rem;
+    font-size: 0.72rem;
 }
 
 .matrix th {
@@ -340,22 +394,19 @@ header {
 
     text-align: left;
 
-    font-weight: 800;
-
     white-space: nowrap;
 }
 
 .matrix td {
     color: #0f172a;
 
-    padding: 8px 9px;
+    background: rgba(255,255,255,0.72);
 
-    background:
-        rgba(255,255,255,0.54);
-
-    border-top:
+    border-bottom:
         1px solid
-        rgba(2,132,199,0.18);
+        #e2e8f0;
+
+    padding: 8px;
 
     vertical-align: middle;
 }
@@ -372,7 +423,7 @@ header {
     font-weight: 900;
 }
 
-.unavailable {
+.na {
     color: #64748b;
 
     font-weight: 800;
@@ -393,9 +444,9 @@ header {
         2px solid
         #0284c7;
 
-    border-radius: 15px;
+    border-radius: 14px;
 
-    padding: 15px;
+    padding: 14px;
 
     margin-top: 12px;
 }
@@ -406,8 +457,6 @@ header {
     font-size: 0.78rem;
 
     font-weight: 900;
-
-    letter-spacing: 1px;
 
     margin-bottom: 10px;
 }
@@ -423,7 +472,7 @@ header {
 
 .position-item {
     background:
-        rgba(255,255,255,0.58);
+        rgba(255,255,255,0.72);
 
     border-radius: 10px;
 
@@ -431,9 +480,9 @@ header {
 }
 
 .position-label {
-    color: #475569;
+    color: #64748b;
 
-    font-size: 0.61rem;
+    font-size: 0.6rem;
 
     font-weight: 800;
 }
@@ -445,56 +494,29 @@ header {
 
     font-weight: 900;
 
-    margin-top: 4px;
+    margin-top: 5px;
 }
 
 
-/* SCORE */
+/* FOOTER */
 
-.score-card {
-    text-align: center;
+.footer-bar {
+    margin-top: 13px;
 
     background:
         rgba(255,255,255,0.58);
 
-    border:
-        1px solid
-        #0284c7;
+    border-radius: 10px;
 
-    border-radius: 12px;
+    padding: 9px;
 
-    padding: 12px;
-}
-
-.score-number {
-    color: #075985;
-
-    font-size: 1.7rem;
-
-    font-weight: 900;
-}
-
-.score-label {
     color: #475569;
 
-    font-size: 0.65rem;
+    font-size: 0.63rem;
 
-    font-weight: 800;
-}
+    font-weight: 700;
 
-
-/* STATUS */
-
-.status-line {
     text-align: center;
-
-    color: #475569;
-
-    font-size: 0.67rem;
-
-    font-weight: 800;
-
-    margin-top: 10px;
 }
 
 
@@ -504,19 +526,23 @@ header {
 
     .block-container {
         padding:
-            7px 10px 20px !important;
+            8px 10px 20px !important;
     }
 
-    .topbar {
-        padding: 10px;
+    .top-header {
+        padding: 9px;
     }
 
-    .logo {
+    .brand {
         font-size: 1.05rem;
     }
 
+    .subtitle {
+        font-size: 0.58rem;
+    }
+
     .winner {
-        padding: 19px 10px;
+        padding: 17px 9px;
     }
 
     .winner-symbol {
@@ -524,7 +550,7 @@ header {
     }
 
     .winner-price {
-        font-size: 1.3rem;
+        font-size: 1.4rem;
     }
 
     .panel {
@@ -537,7 +563,7 @@ header {
     }
 
     .matrix {
-        font-size: 0.65rem;
+        font-size: 0.64rem;
     }
 
     .matrix th,
@@ -553,7 +579,42 @@ header {
 
 
 # ============================================================
-# HELPER: API HEADERS
+# CREDENTIAL CHECK
+# ============================================================
+
+if not DHAN_CLIENT_ID or not DHAN_ACCESS_TOKEN:
+
+    st.markdown(
+        """
+<div class="winner">
+
+<div class="winner-badge">
+⚡ QUANTBREAKOUT
+</div>
+
+<div class="winner-symbol">
+LIVE CONNECTION REQUIRED
+</div>
+
+<div class="winner-name">
+DhanHQ credentials are not configured.
+</div>
+
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.warning(
+        "Add DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN "
+        "to Streamlit Secrets."
+    )
+
+    st.stop()
+
+
+# ============================================================
+# API HEADERS
 # ============================================================
 
 def dhan_headers():
@@ -567,89 +628,30 @@ def dhan_headers():
 
 
 # ============================================================
-# CREDENTIAL CHECK
-# ============================================================
-
-if not DHAN_ACCESS_TOKEN or not DHAN_CLIENT_ID:
-
-    st.markdown(
-        """
-<div class="winner">
-
-<div class="winner-label">
-⚡ QUANTBREAKOUT
-</div>
-
-<div class="winner-symbol">
-LIVE CONNECTION REQUIRED
-</div>
-
-<div class="winner-meta">
-DhanHQ credentials have not been configured.
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    st.error(
-        "Add DHAN_ACCESS_TOKEN and DHAN_CLIENT_ID "
-        "to Streamlit Secrets."
-    )
-
-    st.stop()
-
-
-# ============================================================
-# HEADER
-# ============================================================
-
-st.markdown(
-    """
-<div class="topbar">
-
-<div class="logo">
-⚡ QUANT<span>breakout</span>
-</div>
-
-<div class="live-badge">
-● DHAN LIVE
-</div>
-
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# DYNAMIC INSTRUMENT MASTER
+# LOAD DHAN INSTRUMENT MASTER
 # ============================================================
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_instrument_master():
 
     response = requests.get(
-        INSTRUMENT_MASTER_URL,
-        timeout=30,
+        DHAN_INSTRUMENT_URL,
+        timeout=40,
     )
 
     response.raise_for_status()
 
-    df = pd.read_csv(
+    return pd.read_csv(
         io.BytesIO(response.content),
         low_memory=False,
     )
 
-    return df
 
-
-def get_dynamic_nse_equities():
+def get_nse_equities():
 
     df = load_instrument_master()
 
-    required_columns = [
+    required = [
         "EXCH_ID",
         "SEGMENT",
         "INSTRUMENT",
@@ -659,21 +661,30 @@ def get_dynamic_nse_equities():
     ]
 
     missing = [
-        col
-        for col in required_columns
-        if col not in df.columns
+        x
+        for x in required
+        if x not in df.columns
     ]
 
     if missing:
         raise RuntimeError(
-            "Dhan instrument master changed. "
-            f"Missing columns: {missing}"
+            f"Instrument master missing columns: {missing}"
         )
 
     result = df[
-        (df["EXCH_ID"].astype(str).str.upper() == "NSE")
+        (
+            df["EXCH_ID"]
+            .astype(str)
+            .str.upper()
+            == "NSE"
+        )
         &
-        (df["SEGMENT"].astype(str).str.upper() == "E")
+        (
+            df["SEGMENT"]
+            .astype(str)
+            .str.upper()
+            == "E"
+        )
         &
         (
             df["INSTRUMENT"]
@@ -697,11 +708,9 @@ def get_dynamic_nse_equities():
         "name",
     ]
 
-    result["security_id"] = (
-        pd.to_numeric(
-            result["security_id"],
-            errors="coerce",
-        )
+    result["security_id"] = pd.to_numeric(
+        result["security_id"],
+        errors="coerce",
     )
 
     result = result.dropna(
@@ -726,43 +735,33 @@ def get_dynamic_nse_equities():
         .str.strip()
     )
 
-    result = result[
-        result["symbol"].ne("")
-    ]
-
-    result = result.drop_duplicates(
-        subset=["security_id"]
-    )
-
-    return result.reset_index(
-        drop=True
-    )
+    return result.drop_duplicates(
+        "security_id"
+    ).reset_index(drop=True)
 
 
 # ============================================================
-# CHUNK HELPER
+# CHUNK LIST
 # ============================================================
 
-def chunks(items, size):
+def chunks(values, size):
 
-    for start in range(
+    for i in range(
         0,
-        len(items),
+        len(values),
         size,
     ):
 
-        yield items[
-            start:start + size
+        yield values[
+            i:i + size
         ]
 
 
 # ============================================================
-# REAL-TIME DHAN QUOTE
+# LIVE DHAN QUOTES
 # ============================================================
 
-def fetch_live_quotes(
-    security_ids,
-):
+def fetch_quotes(security_ids):
 
     records = []
 
@@ -773,7 +772,9 @@ def fetch_live_quotes(
         )
     )
 
-    for index, batch in enumerate(batches):
+    for batch_number, batch in enumerate(
+        batches
+    ):
 
         payload = {
             "NSE_EQ": [
@@ -786,30 +787,31 @@ def fetch_live_quotes(
             f"{DHAN_BASE_URL}/marketfeed/quote",
             headers=dhan_headers(),
             json=payload,
-            timeout=20,
+            timeout=25,
         )
 
         if response.status_code != 200:
 
             raise RuntimeError(
-                "Dhan quote API error: "
-                f"{response.status_code} "
-                f"{response.text[:300]}"
+                f"Dhan quote error "
+                f"{response.status_code}: "
+                f"{response.text[:400]}"
             )
 
         body = response.json()
 
-        data = body.get(
-            "data",
-            {},
+        nse = (
+            body
+            .get("data", {})
+            .get("NSE_EQ", {})
         )
 
-        nse = data.get(
-            "NSE_EQ",
-            {},
-        )
+        for security_id, item in nse.items():
 
-        for security_id, quote in nse.items():
+            ohlc = item.get(
+                "ohlc",
+                {},
+            )
 
             records.append(
                 {
@@ -817,86 +819,71 @@ def fetch_live_quotes(
                         str(security_id),
 
                     "last_price":
-                        quote.get(
+                        item.get(
                             "last_price"
                         ),
 
                     "volume":
-                        quote.get(
+                        item.get(
                             "volume"
                         ),
 
                     "average_price":
-                        quote.get(
+                        item.get(
                             "average_price"
                         ),
 
                     "net_change":
-                        quote.get(
+                        item.get(
                             "net_change"
                         ),
 
+                    "day_open":
+                        ohlc.get(
+                            "open"
+                        ),
+
                     "day_high":
-                        quote.get(
-                            "ohlc",
-                            {}
-                        ).get(
+                        ohlc.get(
                             "high"
                         ),
 
                     "day_low":
-                        quote.get(
-                            "ohlc",
-                            {}
-                        ).get(
+                        ohlc.get(
                             "low"
                         ),
 
-                    "day_open":
-                        quote.get(
-                            "ohlc",
-                            {}
-                        ).get(
-                            "open"
-                        ),
-
                     "previous_close":
-                        quote.get(
-                            "ohlc",
-                            {}
-                        ).get(
+                        ohlc.get(
                             "close"
-                        ),
-
-                    "last_trade_time":
-                        quote.get(
-                            "last_trade_time"
                         ),
                 }
             )
 
-        # Dhan Quote API rate limit.
-        if index < len(batches) - 1:
+        if batch_number < len(batches) - 1:
+
             time.sleep(1.05)
 
     if not records:
 
         return pd.DataFrame()
 
-    result = pd.DataFrame(records)
+    result = pd.DataFrame(
+        records
+    )
 
-    numeric_columns = [
+    numeric = [
         "last_price",
         "volume",
         "average_price",
         "net_change",
+        "day_open",
         "day_high",
         "day_low",
-        "day_open",
         "previous_close",
     ]
 
-    for column in numeric_columns:
+    for column in numeric:
 
         result[column] = pd.to_numeric(
             result[column],
@@ -907,11 +894,11 @@ def fetch_live_quotes(
 
 
 # ============================================================
-# REAL-TIME 1-MINUTE CANDLES
+# LIVE 1-MINUTE CANDLES
 # ============================================================
 
-def fetch_intraday_candles(
-    security_id,
+def fetch_intraday(
+    security_id
 ):
 
     now = datetime.now()
@@ -951,7 +938,7 @@ def fetch_intraday_candles(
         f"{DHAN_BASE_URL}/charts/intraday",
         headers=dhan_headers(),
         json=payload,
-        timeout=20,
+        timeout=25,
     )
 
     if response.status_code != 200:
@@ -960,22 +947,16 @@ def fetch_intraday_candles(
 
     body = response.json()
 
-    if not body:
-
-        return pd.DataFrame()
-
-    length = len(
-        body.get(
-            "close",
-            [],
-        )
+    closes = body.get(
+        "close",
+        [],
     )
 
-    if length == 0:
+    if not closes:
 
         return pd.DataFrame()
 
-    df = pd.DataFrame(
+    result = pd.DataFrame(
         {
             "timestamp":
                 body.get(
@@ -1023,46 +1004,151 @@ def fetch_intraday_candles(
         "volume",
     ]:
 
-        df[column] = pd.to_numeric(
-            df[column],
+        result[column] = pd.to_numeric(
+            result[column],
             errors="coerce",
         )
 
-    df = df.dropna(
-        subset=[
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-        ]
-    )
-
-    return df.reset_index(
+    return result.dropna().reset_index(
         drop=True
     )
 
 
 # ============================================================
-# VWAP
+# TWELVE DATA FUNDAMENTALS
 # ============================================================
 
-def calculate_vwap(df):
+@st.cache_data(
+    ttl=3600,
+    show_spinner=False,
+)
+def fetch_fundamentals(
+    symbol,
+):
 
-    if df.empty:
+    if not TWELVE_DATA_API_KEY:
+
+        return {
+            "available":
+                False
+        }
+
+    try:
+
+        response = requests.get(
+            f"{TWELVE_DATA_URL}/statistics",
+            params={
+                "symbol":
+                    symbol,
+
+                "exchange":
+                    "NSE",
+
+                "apikey":
+                    TWELVE_DATA_API_KEY,
+            },
+            timeout=20,
+        )
+
+        if response.status_code != 200:
+
+            return {
+                "available":
+                    False
+            }
+
+        data = response.json()
+
+        if (
+            "statistics"
+            not in data
+        ):
+
+            return {
+                "available":
+                    False
+            }
+
+        stats = data.get(
+            "statistics",
+            {}
+        )
+
+        valuations = stats.get(
+            "valuations_metrics",
+            {}
+        )
+
+        balance = stats.get(
+            "balance_sheet",
+            {}
+        )
+
+        stock_stats = stats.get(
+            "stock_statistics",
+            {}
+        )
+
+        price_summary = stats.get(
+            "stock_price_summary",
+            {}
+        )
+
+        return {
+            "available":
+                True,
+
+            "pe":
+                valuations.get(
+                    "trailing_pe"
+                ),
+
+            "float_shares":
+                stock_stats.get(
+                    "float_shares"
+                ),
+
+            "beta":
+                price_summary.get(
+                    "beta"
+                ),
+
+            "debt_equity":
+                balance.get(
+                    "total_debt_to_equity_mrq"
+                ),
+        }
+
+    except Exception:
+
+        return {
+            "available":
+                False
+        }
+
+
+# ============================================================
+# TECHNICAL CALCULATIONS
+# ============================================================
+
+def calculate_vwap(
+    candles
+):
+
+    if candles.empty:
+
         return None
 
     typical_price = (
-        df["high"]
-        + df["low"]
-        + df["close"]
+        candles["high"]
+        + candles["low"]
+        + candles["close"]
     ) / 3.0
 
-    volume = df["volume"]
+    volume = candles["volume"]
 
-    total_volume = volume.sum()
+    if volume.sum() <= 0:
 
-    if total_volume <= 0:
         return None
 
     return float(
@@ -1070,25 +1156,21 @@ def calculate_vwap(df):
             typical_price
             * volume
         ).sum()
-        / total_volume
+        / volume.sum()
     )
 
 
-# ============================================================
-# EMA
-# ============================================================
-
 def calculate_ema(
-    df,
+    candles,
     period,
 ):
 
-    if len(df) < period:
+    if len(candles) < period:
 
         return None
 
-    value = (
-        df["close"]
+    return float(
+        candles["close"]
         .ewm(
             span=period,
             adjust=False,
@@ -1097,73 +1179,59 @@ def calculate_ema(
         .iloc[-1]
     )
 
-    return float(value)
 
-
-# ============================================================
-# VOLUME SURGE
-# ============================================================
-
-def calculate_volume_surge(
-    df,
+def calculate_volume_ratio(
+    candles
 ):
 
-    if len(df) < 21:
+    if len(candles) < 21:
 
         return None
 
-    current_volume = float(
-        df["volume"].iloc[-1]
-    )
-
-    average_volume = float(
-        df["volume"]
+    average = (
+        candles["volume"]
         .iloc[-21:-1]
         .mean()
     )
 
-    if average_volume <= 0:
+    if average <= 0:
 
         return None
 
-    return (
-        current_volume
-        / average_volume
+    return float(
+        candles["volume"].iloc[-1]
+        / average
     )
 
 
-# ============================================================
-# SUPERTREND
-# ============================================================
-
 def calculate_supertrend(
-    df,
+    candles
 ):
 
-    if len(df) < 20:
+    if len(candles) < 20:
 
         return None
 
     period = 10
-
     multiplier = 3.0
 
     previous_close = (
-        df["close"].shift(1)
+        candles["close"]
+        .shift(1)
     )
 
-    true_range = pd.concat(
+    tr = pd.concat(
         [
-            df["high"]
-            - df["low"],
+            candles["high"]
+            - candles["low"],
 
             (
-                df["high"]
+                candles["high"]
                 - previous_close
             ).abs(),
 
             (
-                df["low"]
+                candles["low"]
                 - previous_close
             ).abs(),
         ],
@@ -1171,258 +1239,138 @@ def calculate_supertrend(
     ).max(axis=1)
 
     atr = (
-        true_range
+        tr
         .rolling(period)
         .mean()
     )
 
     hl2 = (
-        df["high"]
-        + df["low"]
-    ) / 2.0
+        candles["high"]
+        + candles["low"]
+    ) / 2
 
-    upper_band = (
+    upper = (
         hl2
         + multiplier * atr
     )
 
-    lower_band = (
+    lower = (
         hl2
         - multiplier * atr
     )
 
-    close = df["close"]
+    close = candles["close"]
 
+    # Simplified trend test:
+    # current close above lower band and
+    # above previous close.
     return bool(
         close.iloc[-1]
-        > upper_band.iloc[-1]
+        > lower.iloc[-1]
+        and
+        close.iloc[-1]
+        >= close.iloc[-2]
     )
 
 
-# ============================================================
-# MOMENTUM ACCELERATION
-# ============================================================
-
 def calculate_momentum(
-    df,
+    candles
 ):
 
-    if len(df) < 6:
+    if len(candles) < 6:
 
         return None
 
-    recent = (
-        df["close"]
-        .iloc[-1]
+    previous = float(
+        candles["close"].iloc[-6]
     )
 
-    previous = (
-        df["close"]
-        .iloc[-6]
+    current = float(
+        candles["close"].iloc[-1]
     )
 
     if previous <= 0:
 
         return None
 
-    return float(
-        (
-            recent
-            / previous
-            - 1.0
-        )
-        * 100.0
-    )
+    return (
+        (current / previous) - 1
+    ) * 100
 
 
 # ============================================================
 # POSITION SIZER
 # ============================================================
 
-def calculate_position(
-    live_price,
+def position_size(
+    price
 ):
 
-    if (
-        live_price is None
-        or live_price <= 0
-    ):
-
-        return None
-
     shares = math.floor(
-        CAPITAL
-        / live_price
+        CAPITAL / price
     )
 
     risk_unit = (
-        live_price
-        * RISK_PERCENT
+        price * RISK_PERCENT
     )
 
-    stop_loss = (
-        live_price
-        - (
-            risk_unit
-            * SL_MULTIPLIER
-        )
+    sl = (
+        price
+        - risk_unit * SL_MULTIPLIER
     )
 
-    take_profit = (
-        live_price
-        + (
-            risk_unit
-            * TP_MULTIPLIER
-        )
+    tp = (
+        price
+        + risk_unit * TP_MULTIPLIER
     )
 
-    return {
-        "shares":
-            shares,
-
-        "risk_unit":
-            risk_unit,
-
-        "stop_loss":
-            stop_loss,
-
-        "take_profit":
-            take_profit,
-    }
+    return (
+        shares,
+        risk_unit,
+        sl,
+        tp,
+    )
 
 
 # ============================================================
-# MATRIX STATUS
+# VERDICT
 # ============================================================
 
-def verdict_html(
-    verdict,
+def status_html(
+    value
 ):
 
-    if verdict is True:
+    if value is True:
 
         return (
             '<span class="pass">'
-            "🟢 PASS"
-            "</span>"
+            '🟢 PASS'
+            '</span>'
         )
 
-    if verdict is False:
+    if value is False:
 
         return (
             '<span class="fail">'
-            "🔴 FAIL"
-            "</span>"
+            '🔴 FAIL'
+            '</span>'
         )
 
     return (
-        '<span class="unavailable">'
-        "⚪ DATA UNAVAILABLE"
-        "</span>"
+        '<span class="na">'
+        '⚪ DATA UNAVAILABLE'
+        '</span>'
     )
 
 
 # ============================================================
-# MATRIX RENDERER
-# ============================================================
-
-def render_matrix(
-    symbol,
-    name,
-    rows,
-):
-
-    html = """
-<div class="table-wrap">
-
-<table class="matrix">
-
-<thead>
-
-<tr>
-
-<th>
-PARAMETERS FROM SYSTEM SCAN
-</th>
-
-<th>
-STOCK CODE
-</th>
-
-<th>
-STOCK NAME
-</th>
-
-<th>
-VERDICT STATUS
-</th>
-
-<th>
-LIVE METRIC VALUE
-</th>
-
-</tr>
-
-</thead>
-
-<tbody>
-"""
-
-    for row in rows:
-
-        parameter = row["parameter"]
-
-        metric = row["metric"]
-
-        verdict = row["verdict"]
-
-        html += f"""
-<tr>
-
-<td>
-{parameter}
-</td>
-
-<td>
-{symbol}
-</td>
-
-<td>
-{name}
-</td>
-
-<td>
-{verdict_html(verdict)}
-</td>
-
-<td>
-{metric}
-</td>
-
-</tr>
-"""
-
-    html += """
-</tbody>
-
-</table>
-
-</div>
-"""
-
-    st.markdown(
-        html,
-        unsafe_allow_html=True,
-    )
-
-
-# ============================================================
-# TECHNICAL EVALUATION
+# EVALUATE ONE STOCK
 # ============================================================
 
 def evaluate_stock(
     stock,
     candles,
+    fundamentals,
 ):
 
     price = float(
@@ -1433,22 +1381,22 @@ def evaluate_stock(
         stock["volume"]
     )
 
-    current_vwap = calculate_vwap(
+    vwap = calculate_vwap(
         candles
     )
 
     ema9 = calculate_ema(
         candles,
-        EMA_FAST,
+        9
     )
 
     ema21 = calculate_ema(
         candles,
-        EMA_SLOW,
+        21
     )
 
-    volume_surge = (
-        calculate_volume_surge(
+    volume_ratio = (
+        calculate_volume_ratio(
             candles
         )
     )
@@ -1465,341 +1413,409 @@ def evaluate_stock(
         )
     )
 
-    rows = []
+    pe = fundamentals.get(
+        "pe"
+    )
 
+    beta = fundamentals.get(
+        "beta"
+    )
 
-    # --------------------------------------------------------
-    # 1. P/E
-    # --------------------------------------------------------
+    float_shares = fundamentals.get(
+        "float_shares"
+    )
 
-    rows.append(
-        {
-            "parameter":
-                "Price-to-Earnings Ratio",
-
-            "metric":
-                "LIVE FUNDAMENTAL SOURCE REQUIRED",
-
-            "verdict":
-                None,
-        }
+    debt_equity = fundamentals.get(
+        "debt_equity"
     )
 
 
     # --------------------------------------------------------
-    # 2. CMP
+    # FREE FLOAT MARKET CAP
+    # ₹ Crores
     # --------------------------------------------------------
 
-    cmp_pass = (
-        CMP_MIN
-        <= price
-        <= CMP_MAX
-    )
+    if (
+        float_shares is not None
+        and
+        pd.notna(float_shares)
+    ):
 
-    rows.append(
-        {
-            "parameter":
-                "CMP Allocation Bounds",
-
-            "metric":
-                f"₹{price:,.2f}",
-
-            "verdict":
-                cmp_pass,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 3. BETA
-    # --------------------------------------------------------
-
-    rows.append(
-        {
-            "parameter":
-                "Volatility Shield / Beta",
-
-            "metric":
-                "LIVE FUNDAMENTAL SOURCE REQUIRED",
-
-            "verdict":
-                None,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 4. FREE-FLOAT MARKET CAP
-    # --------------------------------------------------------
-
-    rows.append(
-        {
-            "parameter":
-                "Free-Float Market Cap",
-
-            "metric":
-                "LIVE FUNDAMENTAL SOURCE REQUIRED",
-
-            "verdict":
-                None,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 5. VOLUME
-    # --------------------------------------------------------
-
-    volume_pass = (
-        volume
-        >= VOLUME_MIN
-    )
-
-    rows.append(
-        {
-            "parameter":
-                "Volume Liquidity Depth Floor",
-
-            "metric":
-                f"{volume:,.0f} shares",
-
-            "verdict":
-                volume_pass,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 6. DEBT / EQUITY
-    # --------------------------------------------------------
-
-    rows.append(
-        {
-            "parameter":
-                "Debt-to-Equity",
-
-            "metric":
-                "LIVE FUNDAMENTAL SOURCE REQUIRED",
-
-            "verdict":
-                None,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 7. VWAP
-    # --------------------------------------------------------
-
-    if current_vwap is None:
-
-        vwap_metric = (
-            "LIVE CANDLE DATA UNAVAILABLE"
+        free_float_mcap_cr = (
+            price
+            * float(float_shares)
+            / 10_000_000
         )
-
-        vwap_pass = None
 
     else:
 
-        vwap_metric = (
-            f"₹{current_vwap:,.4f}"
+        free_float_mcap_cr = None
+
+
+    rows = []
+
+
+    # 1 P/E
+
+    if pe is None:
+
+        rows.append(
+            {
+                "parameter":
+                    "Price-to-Earnings Ratio ≤ 25",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Fundamental data unavailable",
+            }
         )
 
-        vwap_pass = (
-            price
-            >= current_vwap
+    else:
+
+        rows.append(
+            {
+                "parameter":
+                    "Price-to-Earnings Ratio ≤ 25",
+
+                "verdict":
+                    float(pe) <= PE_MAX,
+
+                "metric":
+                    f"{float(pe):.2f}",
+            }
         )
+
+
+    # 2 CMP
 
     rows.append(
         {
             "parameter":
-                "VWAP Support Anchoring",
-
-            "metric":
-                vwap_metric,
+                "CMP between ₹50 and ₹500",
 
             "verdict":
-                vwap_pass,
+                CMP_MIN
+                <= price
+                <= CMP_MAX,
+
+            "metric":
+                f"₹{price:,.2f}",
         }
     )
 
 
-    # --------------------------------------------------------
-    # 8. EMA 9 / 21
-    # --------------------------------------------------------
+    # 3 Beta
+
+    if beta is None:
+
+        rows.append(
+            {
+                "parameter":
+                    "Beta between 0.60 and 1.20",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Fundamental data unavailable",
+            }
+        )
+
+    else:
+
+        rows.append(
+            {
+                "parameter":
+                    "Beta between 0.60 and 1.20",
+
+                "verdict":
+                    BETA_MIN
+                    <= float(beta)
+                    <= BETA_MAX,
+
+                "metric":
+                    f"{float(beta):.2f}",
+            }
+        )
+
+
+    # 4 Free float market cap
+
+    if free_float_mcap_cr is None:
+
+        rows.append(
+            {
+                "parameter":
+                    "Free-Float Market Cap ≥ ₹5,000 Cr",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Float data unavailable",
+            }
+        )
+
+    else:
+
+        rows.append(
+            {
+                "parameter":
+                    "Free-Float Market Cap ≥ ₹5,000 Cr",
+
+                "verdict":
+                    free_float_mcap_cr
+                    >= FREE_FLOAT_MCAP_MIN_CR,
+
+                "metric":
+                    (
+                        f"₹{free_float_mcap_cr:,.0f} Cr"
+                    ),
+            }
+        )
+
+
+    # 5 Volume
+
+    rows.append(
+        {
+            "parameter":
+                "Traded Volume ≥ 5 Lakh",
+
+            "verdict":
+                volume >= VOLUME_MIN,
+
+            "metric":
+                f"{volume:,.0f} shares",
+        }
+    )
+
+
+    # 6 Debt / Equity
+
+    if debt_equity is None:
+
+        rows.append(
+            {
+                "parameter":
+                    "Debt-to-Equity",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Fundamental data unavailable",
+            }
+        )
+
+    else:
+
+        # User's original strategy did not specify
+        # a numerical D/E threshold.
+        # Therefore display the real value but
+        # do not invent a pass/fail threshold.
+
+        rows.append(
+            {
+                "parameter":
+                    "Debt-to-Equity",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    f"{float(debt_equity):.2f}"
+                    " — threshold required",
+            }
+        )
+
+
+    # 7 VWAP
+
+    if vwap is None:
+
+        rows.append(
+            {
+                "parameter":
+                    "Price above VWAP",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Candle data unavailable",
+            }
+        )
+
+    else:
+
+        rows.append(
+            {
+                "parameter":
+                    "Price above VWAP",
+
+                "verdict":
+                    price >= vwap,
+
+                "metric":
+                    (
+                        f"Price ₹{price:,.2f} | "
+                        f"VWAP ₹{vwap:,.4f}"
+                    ),
+            }
+        )
+
+
+    # 8 EMA
 
     if (
         ema9 is None
         or ema21 is None
     ):
 
-        ema_metric = (
-            "LIVE CANDLE DATA UNAVAILABLE"
-        )
+        rows.append(
+            {
+                "parameter":
+                    "EMA 9 above EMA 21",
 
-        ema_pass = None
+                "verdict":
+                    None,
 
-    else:
-
-        ema_metric = (
-            f"9 EMA ₹{ema9:,.2f} | "
-            f"21 EMA ₹{ema21:,.2f}"
-        )
-
-        ema_pass = (
-            ema9
-            > ema21
-        )
-
-    rows.append(
-        {
-            "parameter":
-                "Exponential Moving Average 9 / 21",
-
-            "metric":
-                ema_metric,
-
-            "verdict":
-                ema_pass,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 9. SUPERTREND
-    # --------------------------------------------------------
-
-    if supertrend is None:
-
-        supertrend_metric = (
-            "LIVE CANDLE DATA UNAVAILABLE"
+                "metric":
+                    "Candle data unavailable",
+            }
         )
 
     else:
 
-        supertrend_metric = (
-            "Bullish"
-            if supertrend
-            else
-            "Bearish"
+        rows.append(
+            {
+                "parameter":
+                    "EMA 9 above EMA 21",
+
+                "verdict":
+                    ema9 > ema21,
+
+                "metric":
+                    (
+                        f"9 EMA ₹{ema9:,.2f} | "
+                        f"21 EMA ₹{ema21:,.2f}"
+                    ),
+            }
         )
+
+
+    # 9 Supertrend
 
     rows.append(
         {
             "parameter":
-                "Supertrend Speed Engine",
-
-            "metric":
-                supertrend_metric,
+                "Supertrend bullish",
 
             "verdict":
                 supertrend,
+
+            "metric":
+                (
+                    "Bullish"
+                    if supertrend
+                    else
+                    "Bearish"
+                    if supertrend is not None
+                    else
+                    "Unavailable"
+                ),
         }
     )
 
 
-    # --------------------------------------------------------
-    # 10. VOLUME SURGE
-    # --------------------------------------------------------
+    # 10 Volume surge
 
-    if volume_surge is None:
+    if volume_ratio is None:
 
-        surge_metric = (
-            "LIVE CANDLE DATA UNAVAILABLE"
+        rows.append(
+            {
+                "parameter":
+                    "Volume ≥ 2× 20-bar average",
+
+                "verdict":
+                    None,
+
+                "metric":
+                    "Candle data unavailable",
+            }
         )
-
-        surge_pass = None
 
     else:
 
-        surge_metric = (
-            f"{volume_surge:.2f}× "
-            "previous 20-bar average"
+        rows.append(
+            {
+                "parameter":
+                    "Volume ≥ 2× 20-bar average",
+
+                "verdict":
+                    volume_ratio
+                    >= VOLUME_SURGE_MULTIPLIER,
+
+                "metric":
+                    f"{volume_ratio:.2f}× average",
+            }
         )
 
-        surge_pass = (
-            volume_surge
-            >= VOLUME_SURGE_MULTIPLIER
-        )
 
-    rows.append(
-        {
-            "parameter":
-                "Institutional Volume Mean Surge",
-
-            "metric":
-                surge_metric,
-
-            "verdict":
-                surge_pass,
-        }
-    )
-
-
-    # --------------------------------------------------------
-    # 11. MOMENTUM
-    # --------------------------------------------------------
+    # 11 Momentum
 
     if momentum is None:
 
-        momentum_metric = (
-            "LIVE CANDLE DATA UNAVAILABLE"
-        )
+        rows.append(
+            {
+                "parameter":
+                    "Positive intraday momentum",
 
-        momentum_pass = None
+                "verdict":
+                    None,
+
+                "metric":
+                    "Candle data unavailable",
+            }
+        )
 
     else:
 
-        momentum_metric = (
-            f"{momentum:+.3f}% "
-            "over last 5 one-minute bars"
+        rows.append(
+            {
+                "parameter":
+                    "Positive intraday momentum",
+
+                "verdict":
+                    momentum > 0,
+
+                "metric":
+                    f"{momentum:+.3f}% / 5 bars",
+            }
         )
 
-        momentum_pass = (
-            momentum > 0
-        )
-
-    rows.append(
-        {
-            "parameter":
-                "Intraday Momentum Acceleration",
-
-            "metric":
-                momentum_metric,
-
-            "verdict":
-                momentum_pass,
-        }
-    )
-
-
-    available = [
-        row["verdict"]
-        for row in rows
-        if row["verdict"] is not None
-    ]
 
     passes = sum(
-        1
-        for value in available
-        if value is True
+        x["verdict"] is True
+        for x in rows
     )
 
     fails = sum(
-        1
-        for value in available
-        if value is False
+        x["verdict"] is False
+        for x in rows
     )
 
-    unavailable = (
-        len(rows)
-        - len(available)
+    unavailable = sum(
+        x["verdict"] is None
+        for x in rows
     )
 
     score = (
-        passes
-        / len(rows)
-    ) * 100.0
+        passes / len(rows)
+    ) * 100
 
     return {
         "rows":
@@ -1816,42 +1832,23 @@ def evaluate_stock(
 
         "score":
             score,
-
-        "vwap":
-            current_vwap,
-
-        "ema9":
-            ema9,
-
-        "ema21":
-            ema21,
-
-        "volume_surge":
-            volume_surge,
-
-        "supertrend":
-            supertrend,
-
-        "momentum":
-            momentum,
     }
 
 
 # ============================================================
-# LOAD DYNAMIC NSE UNIVERSE
+# LOAD UNIVERSE
 # ============================================================
 
 try:
 
     universe = (
-        get_dynamic_nse_equities()
+        get_nse_equities()
     )
 
 except Exception as error:
 
     st.error(
-        "Unable to load the live Dhan "
-        "instrument universe."
+        "Unable to load Dhan's NSE instrument master."
     )
 
     st.code(
@@ -1862,86 +1859,67 @@ except Exception as error:
 
 
 # ============================================================
-# MANUAL CHECK
+# HEADER
 # ============================================================
 
 st.markdown(
     """
-<div class="panel">
+<div class="top-header">
 
-<div class="panel-title">
-🔍 Manual Check Override Field
+<div>
+
+<div class="brand">
+<span class="brand-icon">⚡</span>
+QUANTBREAKOUT
+</div>
+
+<div class="subtitle">
+Real-Time NSE Scanner • DhanHQ Market Data
+</div>
+
+</div>
+
+<div class="live-pill">
+● LIVE ENGINE
+</div>
+
 </div>
 """,
     unsafe_allow_html=True,
 )
 
-manual_symbol = st.text_input(
-    "NSE symbol",
-    placeholder=(
-        "Type any NSE equity symbol "
-        "from the live Dhan instrument master"
-    ),
-    label_visibility="collapsed",
-)
-
-manual_check = st.button(
-    "⚡ CHECK LIVE STOCK",
-    use_container_width=True,
-)
-
-st.markdown(
-    "</div>",
-    unsafe_allow_html=True,
-)
-
 
 # ============================================================
-# LIVE SCAN
+# LIVE QUOTES
 # ============================================================
 
-with st.spinner(
-    "Connecting to Dhan live market server..."
-):
+try:
 
-    try:
+    quotes = fetch_quotes(
+        universe["security_id"].tolist()
+    )
 
-        all_security_ids = (
-            universe[
-                "security_id"
-            ]
-            .tolist()
-        )
+except Exception as error:
 
-        quotes = fetch_live_quotes(
-            all_security_ids
-        )
+    st.error(
+        "Dhan live market connection failed."
+    )
 
-    except Exception as error:
-
-        st.error(
-            "Live market connection failed."
-        )
-
-        st.code(
-            str(error)
-        )
-
-        st.stop()
-
-
-if quotes.empty:
-
-    st.warning(
-        "Dhan returned no live market data."
+    st.code(
+        str(error)
     )
 
     st.stop()
 
 
-# ============================================================
-# JOIN LIVE DATA WITH DYNAMIC INSTRUMENT DATA
-# ============================================================
+if quotes.empty:
+
+    st.warning(
+        "Dhan returned no live quote data."
+    )
+
+    st.stop()
+
 
 market = universe.merge(
     quotes,
@@ -1958,255 +1936,385 @@ market = market.dropna(
 
 
 # ============================================================
-# MANUAL MODE
+# LIVE PRE-FILTER
 # ============================================================
 
-if (
-    manual_check
-    and manual_symbol.strip()
+candidates = market[
+    (
+        market["last_price"]
+        >= CMP_MIN
+    )
+    &
+    (
+        market["last_price"]
+        <= CMP_MAX
+    )
+    &
+    (
+        market["volume"]
+        >= VOLUME_MIN
+    )
+].copy()
+
+
+if candidates.empty:
+
+    st.warning(
+        "No live NSE stock currently meets "
+        "the ₹50–₹500 price and 5-lakh "
+        "volume pre-filter."
+    )
+
+    st.stop()
+
+
+# Highest live volume first.
+candidates = (
+    candidates
+    .sort_values(
+        "volume",
+        ascending=False,
+    )
+    .head(
+        TECHNICAL_CANDIDATES
+    )
+)
+
+
+# ============================================================
+# TECHNICAL SCAN
+# ============================================================
+
+technical_results = []
+
+progress = st.progress(
+    0,
+    text="Scanning live 1-minute candles..."
+)
+
+total = len(candidates)
+
+for number, (
+    _,
+    stock,
+) in enumerate(
+    candidates.iterrows(),
+    start=1,
 ):
 
-    search = (
-        manual_symbol
-        .strip()
-        .upper()
-    )
+    try:
 
-    selected = market[
-        market["symbol"]
-        .astype(str)
-        .str.upper()
-        .eq(search)
-    ]
-
-    if selected.empty:
-
-        st.error(
-            "That symbol was not found "
-            "in the current live NSE "
-            "instrument universe."
+        candles = fetch_intraday(
+            stock["security_id"]
         )
 
-        st.stop()
-
-    selected_stock = (
-        selected.iloc[0]
-    )
-
-    with st.spinner(
-        "Loading live 1-minute data..."
-    ):
-
-        candles = fetch_intraday_candles(
-            selected_stock[
-                "security_id"
-            ]
-        )
-
-    if candles.empty:
-
-        st.error(
-            "Dhan returned no current "
-            "1-minute candle data for "
-            "this instrument."
-        )
-
-        st.stop()
-
-    evaluation = evaluate_stock(
-        selected_stock,
-        candles,
-    )
-
-    winner = {
-        "stock":
-            selected_stock,
-
-        "evaluation":
-            evaluation,
-    }
-
-    scan_results = [
-        winner
-    ]
-
-
-# ============================================================
-# AUTOMATIC SCANNER
-# ============================================================
-
-else:
-
-    # Dynamic price and liquidity filtering.
-    # No stock names are hardcoded.
-
-    candidates = market[
-        (
-            market["last_price"]
-            >= CMP_MIN
-        )
-        &
-        (
-            market["last_price"]
-            <= CMP_MAX
-        )
-        &
-        (
-            market["volume"]
-            >= VOLUME_MIN
-        )
-    ].copy()
-
-    if candidates.empty:
-
-        st.warning(
-            "No live NSE instruments currently "
-            "meet the price and liquidity "
-            "pre-filter."
-        )
-
-        st.stop()
-
-
-    # Rank dynamically by current traded volume.
-    candidates = (
-        candidates
-        .sort_values(
-            "volume",
-            ascending=False,
-        )
-        .head(
-            MAX_TECHNICAL_CANDIDATES
-        )
-    )
-
-
-    scan_results = []
-
-    progress = st.progress(
-        0,
-        text=(
-            "Evaluating live "
-            "technical candidates..."
-        ),
-    )
-
-    total = len(candidates)
-
-    for position, (
-        _,
-        stock,
-    ) in enumerate(
-        candidates.iterrows(),
-        start=1,
-    ):
-
-        try:
-
-            candles = (
-                fetch_intraday_candles(
-                    stock[
-                        "security_id"
-                    ]
-                )
-            )
-
-            if candles.empty:
-
-                continue
-
-            evaluation = (
-                evaluate_stock(
-                    stock,
-                    candles,
-                )
-            )
-
-            scan_results.append(
-                {
-                    "stock":
-                        stock,
-
-                    "evaluation":
-                        evaluation,
-                }
-            )
-
-        except Exception:
+        if candles.empty:
 
             continue
 
-        progress.progress(
-            position / total,
-            text=(
-                f"Evaluating live "
-                f"candidate {position}/{total}"
-            ),
+        vwap = calculate_vwap(
+            candles
         )
 
-        # Stay below Dhan data API rate limits.
-        time.sleep(0.22)
+        ema9 = calculate_ema(
+            candles,
+            9
+        )
 
-    progress.empty()
+        ema21 = calculate_ema(
+            candles,
+            21
+        )
+
+        volume_ratio = (
+            calculate_volume_ratio(
+                candles
+            )
+        )
+
+        supertrend = (
+            calculate_supertrend(
+                candles
+            )
+        )
+
+        momentum = (
+            calculate_momentum(
+                candles
+            )
+        )
+
+        technical_score = 0
+
+        technical_score += (
+            1
+            if vwap is not None
+            and float(stock["last_price"])
+            >= vwap
+            else 0
+        )
+
+        technical_score += (
+            1
+            if ema9 is not None
+            and ema21 is not None
+            and ema9 > ema21
+            else 0
+        )
+
+        technical_score += (
+            1
+            if supertrend is True
+            else 0
+        )
+
+        technical_score += (
+            1
+            if volume_ratio is not None
+            and volume_ratio >= 2
+            else 0
+        )
+
+        technical_score += (
+            1
+            if momentum is not None
+            and momentum > 0
+            else 0
+        )
+
+        technical_results.append(
+            {
+                "stock":
+                    stock,
+
+                "candles":
+                    candles,
+
+                "technical_score":
+                    technical_score,
+            }
+        )
+
+    except Exception:
+        pass
+
+    progress.progress(
+        number / total,
+        text=(
+            f"Live technical scan "
+            f"{number}/{total}"
+        ),
+    )
+
+    time.sleep(0.22)
+
+progress.empty()
 
 
-if not scan_results:
+if not technical_results:
 
     st.warning(
-        "No candidates returned usable "
-        "live 1-minute data."
+        "No live technical candle data "
+        "was returned."
     )
 
     st.stop()
 
 
 # ============================================================
-# WINNER RANKING
+# RANK TECHNICAL RESULTS
 # ============================================================
 
-def ranking_key(item):
-
-    stock = item["stock"]
-
-    evaluation = item["evaluation"]
-
-    return (
-        evaluation["passes"],
-        evaluation["score"],
+technical_results.sort(
+    key=lambda item: (
+        item["technical_score"],
         float(
-            stock["volume"]
+            item["stock"]["volume"]
         ),
-        float(
-            stock["last_price"]
-        ),
-    )
-
-
-scan_results.sort(
-    key=ranking_key,
+    ),
     reverse=True,
 )
 
-winner = scan_results[0]
 
-winner_stock = (
-    winner["stock"]
-)
+# ============================================================
+# FUNDAMENTAL EVALUATION
+# ============================================================
 
-winner_evaluation = (
-    winner["evaluation"]
-)
+final_results = []
+
+fundamental_pool = technical_results[
+    :FUNDAMENTAL_CANDIDATES
+]
+
+
+for item in fundamental_pool:
+
+    stock = item["stock"]
+
+    candles = item["candles"]
+
+    fundamentals = (
+        fetch_fundamentals(
+            stock["symbol"]
+        )
+    )
+
+    evaluation = evaluate_stock(
+        stock,
+        candles,
+        fundamentals,
+    )
+
+    final_results.append(
+        {
+            "stock":
+                stock,
+
+            "evaluation":
+                evaluation,
+
+            "candles":
+                candles,
+        }
+    )
+
+
+if not final_results:
+
+    st.stop()
 
 
 # ============================================================
-# WINNER DISPLAY
+# WINNER
 # ============================================================
+
+final_results.sort(
+    key=lambda item: (
+        item["evaluation"]["passes"],
+        -item["evaluation"]["fails"],
+        item["evaluation"]["score"],
+        float(
+            item["stock"]["volume"]
+        ),
+    ),
+    reverse=True,
+)
+
+winner = final_results[0]
+
+winner_stock = winner["stock"]
+
+winner_eval = winner["evaluation"]
+
+
+# ============================================================
+# TOP STATISTICS
+# ============================================================
+
+c1, c2, c3, c4, c5 = st.columns(5)
+
+with c1:
+
+    st.markdown(
+        f"""
+<div class="stat-card">
+<div class="stat-title">
+Market Status
+</div>
+<div class="stat-value stat-green">
+● LIVE
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+with c2:
+
+    st.markdown(
+        f"""
+<div class="stat-card">
+<div class="stat-title">
+Last Updated
+</div>
+<div class="stat-value">
+{datetime.now().strftime("%H:%M:%S")}
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+with c3:
+
+    st.markdown(
+        f"""
+<div class="stat-card">
+<div class="stat-title">
+NSE Universe
+</div>
+<div class="stat-value">
+{len(universe):,}
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+with c4:
+
+    st.markdown(
+        f"""
+<div class="stat-card">
+<div class="stat-title">
+Live Quotes
+</div>
+<div class="stat-value">
+{len(market):,}
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+with c5:
+
+    st.markdown(
+        f"""
+<div class="stat-card">
+<div class="stat-title">
+Technical Candidates
+</div>
+<div class="stat-value">
+{len(technical_results)}
+</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# WINNER CARD
+# ============================================================
+
+price = float(
+    winner_stock["last_price"]
+)
+
+change = winner_stock["net_change"]
+
+change_text = (
+    f"{float(change):+.2f}"
+    if pd.notna(change)
+    else "—"
+)
 
 st.markdown(
     f"""
 <div class="winner">
 
-<div class="winner-label">
+<div class="winner-badge">
 ⭐ REAL-TIME QUANT BREAKOUT WINNER
 </div>
 
@@ -2214,15 +2322,16 @@ st.markdown(
 {winner_stock["symbol"]}
 </div>
 
-<div class="winner-price">
-₹{float(winner_stock["last_price"]):,.2f}
+<div class="winner-name">
+{winner_stock["name"]}
 </div>
 
-<div class="winner-meta">
-{winner_stock["name"]}
-&nbsp; • &nbsp;
-{winner_evaluation["passes"]}/11
-live conditions passed
+<div class="winner-price">
+₹{price:,.2f}
+</div>
+
+<div class="winner-change">
+Live Change: {change_text}
 </div>
 
 </div>
@@ -2232,88 +2341,37 @@ live conditions passed
 
 
 # ============================================================
-# LIVE SUMMARY CARDS
+# SUMMARY
 # ============================================================
 
-col1, col2, col3, col4 = st.columns(4)
+s1, s2, s3, s4 = st.columns(4)
 
-with col1:
+with s1:
 
-    st.markdown(
-        f"""
-<div class="score-card">
-
-<div class="score-number">
-{winner_evaluation["passes"]}/11
-</div>
-
-<div class="score-label">
-PASS CONDITIONS
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
+    st.metric(
+        "PASS CONDITIONS",
+        f'{winner_eval["passes"]} / 11',
     )
 
+with s2:
 
-with col2:
-
-    st.markdown(
-        f"""
-<div class="score-card">
-
-<div class="score-number">
-{winner_evaluation["fails"]}
-</div>
-
-<div class="score-label">
-FAIL CONDITIONS
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
+    st.metric(
+        "FAIL CONDITIONS",
+        f'{winner_eval["fails"]} / 11',
     )
 
+with s3:
 
-with col3:
-
-    st.markdown(
-        f"""
-<div class="score-card">
-
-<div class="score-number">
-{winner_evaluation["unavailable"]}
-</div>
-
-<div class="score-label">
-DATA UNAVAILABLE
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
+    st.metric(
+        "DATA UNAVAILABLE",
+        f'{winner_eval["unavailable"]} / 11',
     )
 
+with s4:
 
-with col4:
-
-    st.markdown(
-        f"""
-<div class="score-card">
-
-<div class="score-number">
-{winner_evaluation["score"]:.1f}%
-</div>
-
-<div class="score-label">
-LIVE MATRIX SCORE
-</div>
-
-</div>
-""",
-        unsafe_allow_html=True,
+    st.metric(
+        "MATRIX SCORE",
+        f'{winner_eval["score"]:.1f}%',
     )
 
 
@@ -2321,75 +2379,77 @@ LIVE MATRIX SCORE
 # MATRIX
 # ============================================================
 
-st.markdown(
-    """
+matrix_html = """
 <div class="panel">
 
 <div class="panel-title">
-📊 11-Parameter Strategy Performance Grid
+📊 11-PARAMETER STRATEGY MATRIX
 </div>
-""",
-    unsafe_allow_html=True,
-)
 
-render_matrix(
-    winner_stock["symbol"],
-    winner_stock["name"],
-    winner_evaluation["rows"],
-)
+<div class="matrix-wrap">
 
-st.markdown(
-    "</div>",
-    unsafe_allow_html=True,
-)
+<table class="matrix">
 
+<thead>
 
-# ============================================================
-# LIVE MARKET DATA
-# ============================================================
+<tr>
+<th>#</th>
+<th>PARAMETERS FROM SYSTEM SCAN</th>
+<th>STOCK CODE</th>
+<th>STOCK NAME</th>
+<th>VERDICT STATUS</th>
+<th>LIVE METRIC VALUE</th>
+</tr>
 
-st.markdown(
-    """
-<div class="panel">
+</thead>
 
-<div class="panel-title">
-📡 Live Market Server Metrics
+<tbody>
+"""
+
+for index, row in enumerate(
+    winner_eval["rows"],
+    start=1,
+):
+
+    matrix_html += f"""
+<tr>
+
+<td>
+{index}
+</td>
+
+<td>
+{row["parameter"]}
+</td>
+
+<td>
+{winner_stock["symbol"]}
+</td>
+
+<td>
+{winner_stock["name"]}
+</td>
+
+<td>
+{status_html(row["verdict"])}
+</td>
+
+<td>
+{row["metric"]}
+</td>
+
+</tr>
+"""
+
+matrix_html += """
+</tbody>
+</table>
 </div>
-""",
-    unsafe_allow_html=True,
-)
-
-metric_col1, metric_col2, metric_col3 = st.columns(3)
-
-with metric_col1:
-
-    st.metric(
-        "LIVE PRICE",
-        f"₹{float(winner_stock['last_price']):,.2f}",
-    )
-
-with metric_col2:
-
-    st.metric(
-        "DAY VOLUME",
-        f"{int(winner_stock['volume']):,}",
-    )
-
-with metric_col3:
-
-    st.metric(
-        "DAY CHANGE",
-        (
-            f"{float(winner_stock['net_change']):+.2f}"
-            if pd.notna(
-                winner_stock["net_change"]
-            )
-            else "—"
-        ),
-    )
+</div>
+"""
 
 st.markdown(
-    "</div>",
+    matrix_html,
     unsafe_allow_html=True,
 )
 
@@ -2398,22 +2458,16 @@ st.markdown(
 # POSITION SIZER
 # ============================================================
 
-live_price = float(
-    winner_stock["last_price"]
+shares, risk_unit, sl, tp = (
+    position_size(price)
 )
 
-position = calculate_position(
-    live_price
-)
-
-if position:
-
-    st.markdown(
-        f"""
+st.markdown(
+    f"""
 <div class="position">
 
 <div class="position-title">
-🧮 ₹15,000 FIXED STRATEGY RISK BRACKET
+🧮 POSITION SIZING — ₹15,000 CAPITAL
 </div>
 
 <div class="position-grid">
@@ -2425,7 +2479,7 @@ TARGET POSITION
 </div>
 
 <div class="position-value">
-BUY EXACTLY {position["shares"]} SHARES
+BUY EXACTLY {shares} SHARES
 </div>
 
 </div>
@@ -2437,7 +2491,7 @@ SYSTEM RISK UNIT
 </div>
 
 <div class="position-value">
-₹{position["risk_unit"]:,.2f}
+₹{risk_unit:,.2f}
 </div>
 
 </div>
@@ -2445,11 +2499,11 @@ SYSTEM RISK UNIT
 <div class="position-item">
 
 <div class="position-label">
-🔒 AUTOMATED SL SAFETY FLOOR
+🔒 AUTOMATED STOP LOSS
 </div>
 
 <div class="position-value">
-₹{position["stop_loss"]:,.2f}
+₹{sl:,.2f}
 </div>
 
 </div>
@@ -2457,11 +2511,11 @@ SYSTEM RISK UNIT
 <div class="position-item">
 
 <div class="position-label">
-🎯 AUTOMATED TAKE-PROFIT CEILING
+🎯 AUTOMATED TAKE PROFIT
 </div>
 
 <div class="position-value">
-₹{position["take_profit"]:,.2f}
+₹{tp:,.2f}
 </div>
 
 </div>
@@ -2470,54 +2524,159 @@ SYSTEM RISK UNIT
 
 </div>
 """,
-        unsafe_allow_html=True,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# MANUAL CHECK
+# ============================================================
+
+st.markdown(
+    """
+<div class="panel">
+
+<div class="panel-title">
+🔍 MANUAL CHECK OVERRIDE
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+manual_symbol = st.text_input(
+    "Enter NSE symbol",
+    placeholder="Enter any NSE equity symbol",
+    label_visibility="collapsed",
+)
+
+if manual_symbol:
+
+    symbol = (
+        manual_symbol
+        .strip()
+        .upper()
     )
 
+    found = market[
+        market["symbol"]
+        .astype(str)
+        .str.upper()
+        .eq(symbol)
+    ]
 
-# ============================================================
-# DATA SOURCE / STATUS
-# ============================================================
+    if found.empty:
 
-current_time = datetime.now().strftime(
-    "%H:%M:%S"
+        st.warning(
+            "Symbol is not present in the "
+            "current Dhan NSE instrument master."
+        )
+
+    else:
+
+        manual_stock = (
+            found.iloc[0]
+        )
+
+        with st.spinner(
+            "Loading live manual-check data..."
+        ):
+
+            manual_candles = (
+                fetch_intraday(
+                    manual_stock[
+                        "security_id"
+                    ]
+                )
+            )
+
+            manual_fundamentals = (
+                fetch_fundamentals(
+                    manual_stock[
+                        "symbol"
+                    ]
+                )
+            )
+
+        if not manual_candles.empty:
+
+            manual_eval = (
+                evaluate_stock(
+                    manual_stock,
+                    manual_candles,
+                    manual_fundamentals,
+                )
+            )
+
+            st.success(
+                f"Live check completed for {symbol}"
+            )
+
+            manual_html = """
+<div class="matrix-wrap">
+<table class="matrix">
+<thead>
+<tr>
+<th>#</th>
+<th>PARAMETER</th>
+<th>VERDICT</th>
+<th>LIVE VALUE</th>
+</tr>
+</thead>
+<tbody>
+"""
+
+            for i, row in enumerate(
+                manual_eval["rows"],
+                start=1,
+            ):
+
+                manual_html += f"""
+<tr>
+<td>{i}</td>
+<td>{row["parameter"]}</td>
+<td>{status_html(row["verdict"])}</td>
+<td>{row["metric"]}</td>
+</tr>
+"""
+
+            manual_html += """
+</tbody>
+</table>
+</div>
+"""
+
+            st.markdown(
+                manual_html,
+                unsafe_allow_html=True,
+            )
+
+st.markdown(
+    "</div>",
+    unsafe_allow_html=True,
 )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
 
 st.markdown(
     f"""
-<div class="status-line">
+<div class="footer-bar">
 
-● LIVE MARKET SNAPSHOT FROM DHANHQ
-&nbsp; • &nbsp;
-DYNAMIC NSE INSTRUMENT MASTER
-&nbsp; • &nbsp;
-{len(universe):,} NSE EQUITY INSTRUMENTS
-&nbsp; • &nbsp;
-{len(market):,} LIVE QUOTES
-&nbsp; • &nbsp;
-{len(scan_results):,} TECHNICAL RESULTS
-&nbsp; • &nbsp;
-LAST CHECK {current_time}
+📡 DATA: DhanHQ Live Market Data
+&nbsp;&nbsp; • &nbsp;&nbsp;
+
+📊 FUNDAMENTALS: Twelve Data NSE Statistics
+&nbsp;&nbsp; • &nbsp;&nbsp;
+
+🔄 AUTO REFRESH: 15 seconds
+&nbsp;&nbsp; • &nbsp;&nbsp;
+
+🕒 SERVER TIME:
+{datetime.now().strftime("%d-%m-%Y %H:%M:%S")}
 
 </div>
 """,
     unsafe_allow_html=True,
 )
-
-
-# ============================================================
-# REFRESH
-# ============================================================
-
-st.markdown(
-    "<br>",
-    unsafe_allow_html=True,
-)
-
-if st.button(
-    "🔄 REFRESH LIVE MARKET DATA",
-    use_container_width=True,
-):
-
-    st.cache_data.clear()
-
-    st.rerun()
