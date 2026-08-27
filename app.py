@@ -103,123 +103,110 @@ def scan_live_exchange_watchlist():
 
 watchlist_pool = scan_live_exchange_watchlist()
 
-# Safeguard pointer index boundaries safely
-st.session_state.current_item_pointer = st.session_state.current_item_pointer % len(watchlist_pool)
-auto_scanned_ticker = watchlist_pool[st.session_state.current_item_pointer].upper()
-
 # ==========================================
-# 🔍 INTERACTIVE MANUAL SC OVERRIDE DESK FIELD
+# 🏛️ SERVER RENDER CONTROLS
 # ==========================================
-st.markdown("<div class='blueprint-container'><div style='font-size: 0.78rem; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #0284c7; padding-bottom: 5px; margin-bottom: 8px;'>🔍 MANUAL CHECK OVERRIDE FIELD</div>", unsafe_allow_html=True)
-manual_input_raw = st.text_input("Type Stock Code Here:", placeholder="Type any NSE Stock Symbol Code (e.g., SAIL, SBIN, INFY) and hit Enter key...", key="manual_override_search_field", label_visibility="collapsed")
-cleaned_manual_query = manual_input_raw.upper().strip()
-st.markdown("</div>", unsafe_allow_html=True)
+# FIXED: Shield boundary loop condition to completely prevent division by zero crashes if the watchlist is temporarily blank
+if not watchlist_pool or len(watchlist_pool) == 0:
+    st.info("📡 SYNCING DIRECT DATA METRICS... PLEASE REFRESH IN 3 SECONDS")
+else:
+    # Safeguard pointer index boundaries safely away from zero values
+    st.session_state.current_item_pointer = st.session_state.current_item_pointer % len(watchlist_pool)
+    auto_scanned_ticker = watchlist_pool[st.session_state.current_item_pointer].upper()
 
-target_ticker = cleaned_manual_query if cleaned_manual_query else auto_scanned_ticker
+    # ==========================================
+    # 🔍 INTERACTIVE MANUAL SC OVERRIDE DESK FIELD
+    # ==========================================
+    st.markdown("<div class='blueprint-container'><div style='font-size: 0.78rem; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #0284c7; padding-bottom: 5px; margin-bottom: 8px;'>🔍 MANUAL CHECK OVERRIDE FIELD</div>", unsafe_allow_html=True)
+    manual_input_raw = st.text_input("Type Stock Code Here:", placeholder="Type any NSE Stock Symbol Code (e.g., SAIL, SBIN, INFY) and hit Enter key...", key="manual_override_search_field", label_visibility="collapsed")
+    cleaned_manual_query = manual_input_raw.upper().strip()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# ==========================================
-# 📊 REAL-TIME VALUE RETRIEVAL ENGINE
-# ==========================================
-live_price = 0.00
-volume = 0
-pe_val = 18.5
-beta_val = 1.02
-mcap_val = 12000
-dynamic_vwap_line = 0.00
+    target_ticker = cleaned_manual_query if cleaned_manual_query else auto_scanned_ticker
 
-try:
-    nse_key_string = target_ticker + ".NS"
-    india_data_pipe = yf.Ticker(nse_key_string)
-    
-    live_df = india_data_pipe.history(period="1d", interval="1m")
-    if live_df.empty:
-        live_df = india_data_pipe.history(period="1d")
+    # ==========================================
+    # 📊 REAL-TIME VALUE RETRIEVAL ENGINE
+    # ==========================================
+    live_price = 0.00
+    volume = 0
+    pe_val = 18.5
+    beta_val = 1.02
+    mcap_val = 12000
+    dynamic_vwap_line = 0.00
+
+    try:
+        nse_key_string = target_ticker + ".NS"
+        india_data_pipe = yf.Ticker(nse_key_string)
         
-    if not live_df.empty:
-        live_price = live_df['Close'].iloc[-1]
-        volume = live_df['Volume'].iloc[-1]
-        
-        # Executing a true, professional intraday VWAP formula calculation natively from the data frames
-        typical_price = (live_df['High'] + live_df['Low'] + live_df['Close']) / 3
-        dynamic_vwap_line = typical_price.iloc[-1]
-        
-        pe_val = india_data_pipe.info.get('trailingPE', 18.5)
-        beta_val = india_data_pipe.info.get('beta', 1.02)
-        mcap_val = india_data_pipe.info.get('marketCap', 10000000000) / 10000000
-except:
-    pass
+        live_df = india_data_pipe.history(period="1d", interval="1m")
+        if live_df.empty:
+            live_df = india_data_pipe.history(period="1d")
+            
+        if not live_df.empty:
+            live_price = live_df['Close'].iloc[-1]
+            volume = live_df['Volume'].iloc[-1]
+            
+            # Executing a true, professional intraday VWAP formula calculation natively from the data frames
+            typical_price = (live_df['High'] + live_df['Low'] + live_df['Close']) / 3
+            dynamic_vwap_line = typical_price.iloc[-1]
+            
+            pe_val = india_data_pipe.info.get('trailingPE', 18.5)
+            beta_val = india_data_pipe.info.get('beta', 1.02)
+            mcap_val = india_data_pipe.info.get('marketCap', 10000000000) / 10000000
+    except:
+        pass
 
-# Strategy Threshold Checks Math
-check1 = "🟢 PASS" if (50 <= live_price <= 500) else "🔴 FAIL"
-check2 = "🟢 PASS" if (pe_val <= 25 or pe_val == 0) else "🔴 FAIL"
-check3 = "🟢 PASS" if (0.60 <= beta_val <= 1.20) else "🔴 FAIL"
-check4 = "🟢 PASS" if (mcap_val >= 5000 or mcap_val == 0) else "🔴 FAIL"
-check5 = "🟢 PASS" if (volume >= 500000 or volume == 0) else "🔴 FAIL"
+    # Strategy Threshold Checks Math
+    check1 = "🟢 PASS" if (50 <= live_price <= 500) else "🔴 FAIL"
+    check2 = "🟢 PASS" if (pe_val <= 25 or pe_val == 0) else "🔴 FAIL"
+    check3 = "🟢 PASS" if (0.60 <= beta_val <= 1.20) else "🔴 FAIL"
+    check4 = "🟢 PASS" if (mcap_val >= 5000 or mcap_val == 0) else "🔴 FAIL"
+    check5 = "🟢 PASS" if (volume >= 500000 or volume == 0) else "🔴 FAIL"
 
-# 1. PREMIUM STOCK OF THE DAY DISPLAY PANEL
-st.markdown(f"""
-    <div class='winner-gold-frame'>
-        <div style='font-size: 0.85rem; font-weight: 900; color: #854d0e; letter-spacing: 0.5px;'>⭐ REAL-TIME QUANT BREAKOUT WINNER</div>
-        <div style='font-size:2.6rem; font-weight:900; color:#0f172a; margin: 2px 0;'>{target_ticker}</div>
-        <div id='winner-price-display' style='font-size:1.35rem; color:#15803d; font-weight:700;'>Live Price: ₹{live_price:.2f}</div>
-    </div>
-""", unsafe_allow_html=True)
+    # 1. PREMIUM STOCK OF THE DAY DISPLAY PANEL
+    st.markdown(f"""
+        <div class='winner-gold-frame'>
+            <div style='font-size: 0.85rem; font-weight: 900; color: #854d0e; letter-spacing: 0.5px;'>⭐ REAL-TIME QUANT BREAKOUT WINNER</div>
+            <div style='font-size:2.6rem; font-weight:900; color:#0f172a; margin: 2px 0;'>{target_ticker}</div>
+            <div id='winner-price-display' style='font-size:1.35rem; color:#15803d; font-weight:700;'>Live Price: ₹{live_price:.2f}</div>
+        </div>
+    """, unsafe_allow_html=True)
 
-# Symmetric Carousel Navigation Controls directly below the gold container block
-btn_space1, btn_space2 = st.columns(2)
-with btn_space1:
-    if st.button(" ❬  PREVIOUS ASSET "):
-        st.session_state.current_item_pointer = (st.session_state.current_item_pointer - 1) % len(watchlist_pool)
-        st.rerun()
-with btn_space2:
-    if st.button(" NEXT ASSET  ❭ "):
-        st.session_state.current_item_pointer = (st.session_state.current_item_pointer + 1) % len(watchlist_pool)
-        st.rerun()
+    # Symmetric Carousel Navigation Controls directly below the gold container block
+    btn_space1, btn_space2 = st.columns(2)
+    with btn_space1:
+        if st.button(" ❬  PREVIOUS ASSET "):
+            st.session_state.current_item_pointer = (st.session_state.current_item_pointer - 1) % len(watchlist_pool)
+            st.rerun()
+    with btn_space2:
+        if st.button(" NEXT ASSET  ❭ "):
+            st.session_state.current_item_pointer = (st.session_state.current_item_pointer + 1) % len(watchlist_pool)
+            st.rerun()
 
-st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-# ==========================================
-# 📊 COMPLETE 11-ROW DATA LEDGER ENGINE (UNTOUCHED DESIGN)
-# ==========================================
-st.write("<h3 style='color:#0369a1; font-weight:900;'>📋 11-PARAMETER STRATEGY MATRIX PROFILE</h3>", unsafe_allow_html=True)
+    # 2. COMPLETE 11-ROW DATA LEDGER ENGINE (UNTOUCHED DESIGN)
+    st.write("<h3 style='color:#0369a1; font-weight:900;'>📋 11-PARAMETER STRATEGY MATRIX PROFILE</h3>", unsafe_allow_html=True)
 
-matrix_data_grid = {
-    "PARAMETERS FROM SYSTEM SCAN": [
-        "1. Price-to-Earnings Ratio Gate Layer",
-        "2. CMP Allocation Bounds Range (₹50-₹500)",
-        "3. Volatility Shield Protection (Beta 0.60-1.20)",
-        "4. Market Capitalization Safety Cushion (> ₹5k Cr)",
-        "5. Volume Liquidity Depth Floor (> 5 Lakh Shares)",
-        "6. Financial Health Leverage Checking",
-        "7. VWAP Support Anchoring Level Check",
-        "8. Exponential Moving Average Cross (9/21)",
-        "9. Supertrend Speed Engine Cloud Map",
-        "10. Institutional Volume Mean Surge",
-        "11. Intraday Momentum Acceleration Velocity"
-    ],
-    "STOCK CODE": ["NSE/BSE"] * 11,
-    "STOCK NAME": [target_ticker] * 11,
-    "VERDICT STATUS": [check2, check1, check3, check4, check5, "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS"],
-    "LIVE METRIC VALUE": [
-        f"P/E: {pe_val:.2f}" if pe_val > 0 else "P/E: 17.30 (Live Match)",
-        f"₹{live_price:.2f}",
-        f"Beta: {beta_val:.2f}",
-        f"₹{mcap_val:,.2f} Cr" if mcap_val > 0 else "₹74,126.00 Cr",
-        f"{volume:,.0f} Shares" if volume > 0 else "31,200,000 Shares",
-        "Ratio: 1.45 (Optimal)",
-        f"Calculated VWAP Floor: ₹{dynamic_vwap_line:.2f} 🟢",
-        "9/21 EMA Alignment Live",
-        "Cloud Trend Green",
-        "Institutional Support active",
-        "Momentum Speed Active"
-    ]
-}
-
-st.dataframe(pd.DataFrame(matrix_data_grid), use_container_width=True, hide_index=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Risk position sizing calculator calculations card panel
-final_price_ref = live_price if live_price > 0 else 150.00
-risk_unit = final_price_ref * 0.008
-sl_floor = final_price_ref - (risk_unit * 1.5)
+    matrix_data_grid = {
+        "PARAMETERS FROM SYSTEM SCAN": [
+            "1. Price-to-Earnings Ratio Gate Layer",
+            "2. CMP Allocation Bounds Range (₹50-₹500)",
+            "3. Volatility Shield Protection (Beta 0.60-1.20)",
+            "4. Market Capitalization Safety Cushion (> ₹5k Cr)",
+            "5. Volume Liquidity Depth Floor (> 5 Lakh Shares)",
+            "6. Financial Health Leverage Checking",
+            "7. VWAP Support Anchoring Level Check",
+            "8. Exponential Moving Average Cross (9/21)",
+            "9. Supertrend Speed Engine Cloud Map",
+            "10. Institutional Volume Mean Surge",
+            "11. Intraday Momentum Acceleration Velocity"
+        ],
+        "STOCK CODE": ["NSE/BSE"] * 11,
+        "STOCK NAME": [target_ticker] * 11,
+        "VERDICT STATUS": [check2, check1, check3, check4, check5, "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS"],
+        "LIVE METRIC VALUE": [
+            f"P/E: {pe_val:.2f}" if pe_val > 0 else "P/E: 17.30 (Live Match)",
+            f"₹{live_price:.2f}",
+            f"Beta: {beta_val:.2f}",
+            f"₹{mcap_val:,.2f} Cr" if mcap_val > 0 else "₹74,126.00 Cr",
