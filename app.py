@@ -180,7 +180,7 @@ else:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Pre-calculate string values to avoid unclosed string/bracket conflicts completely inside the dictionary layout
+    # Pre-calculate string values safely outside the structural dictionaries
     str_pe = "P/E: " + str(round(pe_val, 2))
     str_price = "₹" + str(round(live_price, 2))
     str_beta = "Beta: " + str(round(beta_val, 2))
@@ -193,24 +193,20 @@ else:
     # ==========================================
     st.write("<h3 style='color:#0369a1; font-weight:900;'>📋 11-PARAMETER STRATEGY MATRIX PROFILE</h3>", unsafe_allow_html=True)
 
-    # FIXED: Re-built the dictionary with purely sealed, static pre-formatted text variables
-    matrix_data_grid = {
-        "PARAMETERS FROM SYSTEM SCAN": [
-            "1. Price-to-Earnings Ratio Gate Layer",
-            "2. CMP Allocation Bounds Range (₹50-₹500)",
-            "3. Volatility Shield Protection (Beta 0.60-1.20)",
-            "4. Market Capitalization Safety Cushion (> ₹5k Cr)",
-            "5. Volume Liquidity Depth Floor (> 5 Lakh Shares)",
-            "6. Financial Health Leverage Checking",
-            "7. VWAP Support Anchoring Level Check",
-            "8. Exponential Moving Average Cross (9/21)",
-            "9. Supertrend Speed Engine Cloud Map",
-            "10. Institutional Volume Mean Surge",
-            "11. Intraday Momentum Acceleration Velocity"
-        ],
-        "STOCK CODE": ["NSE/BSE"] * 11,
-        "STOCK NAME": [target_ticker] * 11,
-        "VERDICT STATUS": [check2, check1, check3, check4, check5, "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS"],
-        "LIVE METRIC VALUE": [
-            str_pe,
-            str_price,
+    # FIXED: Re-built rows into flat sequential variable lists to ensure NO open arrays or trailing brackets exist inside the dictionary block
+    list_parameters = [
+        "1. Price-to-Earnings Ratio Gate Layer",
+        "2. CMP Allocation Bounds Range (₹50-₹500)",
+        "3. Volatility Shield Protection (Beta 0.60-1.20)",
+        "4. Market Capitalization Safety Cushion (> ₹5k Cr)",
+        "5. Volume Liquidity Depth Floor (> 5 Lakh Shares)",
+        "6. Financial Health Leverage Checking",
+        "7. VWAP Support Anchoring Level Check",
+        "8. Exponential Moving Average Cross (9/21)",
+        "9. Supertrend Speed Engine Cloud Map",
+        "10. Institutional Volume Mean Surge",
+        "11. Intraday Momentum Acceleration Velocity"
+    ]
+    list_codes = ["NSE/BSE"] * 11
+    list_names = [target_ticker] * 11
+    list_verdicts = [check2, check1, check3, check4, check5, "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS", "🟢 PASS"]
