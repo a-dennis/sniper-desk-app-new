@@ -161,6 +161,24 @@ def evaluate_symbol(inst: Instrument) -> dict:
     verdict, detail = momentum_check(candles)
     rows.append(("Intraday Momentum Acceleration", verdict, detail))
 
+    # Technical score = how many of the 5 real intraday signals (VWAP, EMA
+    # cross, Supertrend, volume surge, momentum) are currently PASS. This is
+    # what decides the winner now, not the fundamentals rows above — see
+    # the "safety_pass" gate below for why fundamentals still matter, just
+    # differently.
+    technical_rows = rows[6:]  # VWAP, EMA, Supertrend, vol surge, momentum
+    technical_score = sum(1 for _, v, _ in technical_rows if v == "pass")
+
+    # Safety gate: must trade in our budget range, and — only if the data is
+    # actually available — must clear the market-cap floor. Missing
+    # fundamental data does NOT disqualify a stock (Yahoo's free fundamentals
+    # are unreliable for some names), it just means that particular check is
+    # skipped rather than treated as a fail.
+    cmp_ok = bounded(ltp, 50, 500) == "pass"
+    mcap_verdict = gte(fund["market_cap_cr"], 5000)
+    mcap_ok = mcap_verdict in ("pass", "unavailable")
+    safety_pass = cmp_ok and mcap_ok
+
     return {
         "symbol": inst.trading_symbol,
         "ltp": ltp,
@@ -168,17 +186,20 @@ def evaluate_symbol(inst: Instrument) -> dict:
         "change_pct": quotes.get("change_pct", 0.0),
         "volume": volume,
         "rows": rows,
+        "technical_score": technical_score,
+        "safety_pass": safety_pass,
     }
 
 
 def pick_winner(pool: list[Instrument]) -> dict:
-    """Highest live traded volume among the scan pool = 'breakout winner'."""
-    quotes = get_live_quotes(pool)
-    if not quotes:
-        return evaluate_symbol(pool[0])
-    top_symbol = max(quotes, key=lambda s: quotes[s]["volume"])
-    top_inst = next(i for i in pool if i.trading_symbol == top_symbol)
-    return evaluate_symbol(top_inst)
+    """Winner = highest intraday technical score (VWAP/EMA/Supertrend/volume
+    surge/momentum alignment) among stocks that clear the basic safety gate
+    (tradeable price range + market cap floor, when available). Ties broken
+    by higher traded volume. This replaces the old 'highest volume wins'
+    logic with something that actually reflects intraday setup strength."""
+    evaluations = [evaluate_symbol(inst) for inst in pool]
+    candidates = [e for e in evaluations if e["safety_pass"]] or evaluations
+    return max(candidates, key=lambda e: (e["technical_score"], e["volume"]))
 
 
 # ---------------------------------------------------------------- header ---
@@ -281,32 +302,4 @@ with col_matrix:
 with col_summary:
     st.markdown('<div class="qb-panel">', unsafe_allow_html=True)
     st.markdown("**📊 Live Summary**")
-    st.metric("Pass Conditions", f"{pass_count} / 11")
-    st.metric("Fail Conditions", f"{fail_count} / 11")
-    st.metric("Data Unavailable", f"{unavail_count} / 11")
-    st.metric("Matrix Score", f"{score}%")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------------------------------------------------------- position sizer -
-st.markdown("#### 🧮 Position Sizing (₹15,000 Capital)")
-price = snapshot["ltp"] or 0.01
-shares = int(round(CAPITAL / price))
-risk_unit = price * 0.008
-sl = price - (risk_unit * 1.5)
-tp = price + (risk_unit * 3.0)
-
-size_cols = st.columns(4)
-size_cols[0].markdown(f'<div class="qb-panel">🛒 <b>Buy Exactly</b><br><span style="font-size:1.4em;">{shares} SHARES</span></div>', unsafe_allow_html=True)
-size_cols[1].markdown(f'<div class="qb-panel">🛡️ <b>Risk Unit</b><br><span style="font-size:1.4em;">₹{risk_unit:,.2f}</span></div>', unsafe_allow_html=True)
-size_cols[2].markdown(f'<div class="qb-panel">🔒 <b>Stop Loss</b><br><span style="font-size:1.4em;color:#b91c1c;">₹{sl:,.2f}</span></div>', unsafe_allow_html=True)
-size_cols[3].markdown(f'<div class="qb-panel">🎯 <b>Take Profit</b><br><span style="font-size:1.4em;color:#15803d;">₹{tp:,.2f}</span></div>', unsafe_allow_html=True)
-
-st.caption(
-    f"Risk per trade: ₹{risk_unit:,.2f} ({(risk_unit/price*100):.2f}%) | SL: 1.5x Risk | TP: 3.0x Risk. "
-    "This is a fixed mechanical calculation from the formulas you specified, not investment advice."
-)
-
-# ---------------------------------------------------------- auto refresh --
-if is_open and not st.session_state.manual_symbol:
-    time.sleep(10)
-    st.rerun()
+    st.metric("Pass Conditions",
