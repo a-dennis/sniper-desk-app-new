@@ -115,7 +115,7 @@ def evaluate_symbol(inst):
     quotes = get_live_quotes([inst]).get(inst.trading_symbol, {})
     ltp = quotes.get("ltp", 0.0)
     volume = quotes.get("volume", 0)
-    candles = get_intraday_candles(inst.instrument_token)
+    candles = get_intraday_candles(inst.trading_symbol)
     fund = get_fundamentals(inst.trading_symbol)
 
     rows = []
@@ -154,10 +154,12 @@ def evaluate_symbol(inst):
     technical_rows = rows[6:]
     technical_score = sum(1 for row in technical_rows if row[1] == "pass")
 
-    cmp_ok = bounded(ltp, 50, 500) == "pass"
+    # Safety gate: only clear the market-cap floor when that data is
+    # actually available (missing data never disqualifies a stock). Price
+    # range is no longer a gate -- every stock in the pool is eligible.
     mcap_verdict = gte(fund["market_cap_cr"], 5000)
     mcap_ok = mcap_verdict in ("pass", "unavailable")
-    safety_pass = cmp_ok and mcap_ok
+    safety_pass = mcap_ok
 
     return {
         "symbol": inst.trading_symbol,
@@ -291,18 +293,4 @@ risk_unit = price * 0.008
 sl = price - (risk_unit * 1.5)
 tp = price + (risk_unit * 3.0)
 
-size_cols = st.columns(4)
-size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
-size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
-size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
-size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
-
-risk_pct = risk_unit / price * 100
-st.caption(
-    "Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") + "%) | SL: 1.5x Risk | TP: 3.0x Risk. "
-    "This is a fixed mechanical calculation, not investment advice."
-)
-
-if is_open and not st.session_state.manual_symbol:
-    time.sleep(10)
-    st.rerun()
+size_cols =
