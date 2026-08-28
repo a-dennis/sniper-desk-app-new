@@ -36,11 +36,10 @@ from indicators import (
 )
 
 CAPITAL = 15_000
-MAX_SCAN_UNIVERSE = 250  # see README "Tuning the scan pool" before raising this
+MAX_SCAN_UNIVERSE = 250
 
-st.set_page_config(page_title="QuantBreakout Scanner", layout="wide", page_icon="⚡")
+st.set_page_config(page_title="QuantBreakout Scanner", layout="wide", page_icon="lightning")
 
-# ---------------------------------------------------------------- styling --
 st.markdown(
     """
     <style>
@@ -74,48 +73,45 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------------------------------------------------------- state ----
 if "pointer" not in st.session_state:
     st.session_state.pointer = 0
 if "manual_symbol" not in st.session_state:
     st.session_state.manual_symbol = None
 if "last_snapshot" not in st.session_state:
-    st.session_state.last_snapshot = None  # cached values for after-hours display
+    st.session_state.last_snapshot = None
 
 
-def badge(verdict: str) -> str:
+def badge(verdict):
     label = {"pass": "PASS", "fail": "FAIL", "unavailable": "DATA UNAVAILABLE"}[verdict]
     cls = {"pass": "qb-badge-pass", "fail": "qb-badge-fail", "unavailable": "qb-badge-unavail"}[verdict]
-    return f'<span class="{cls}">{label}</span>'
+    return '<span class="' + cls + '">' + label + '</span>'
 
 
-def bounded(value: float | None, lo: float, hi: float) -> str:
+def bounded(value, lo, hi):
     if value is None:
         return "unavailable"
     return "pass" if lo <= value <= hi else "fail"
 
 
-def gte(value: float | None, threshold: float) -> str:
+def gte(value, threshold):
     if value is None:
         return "unavailable"
     return "pass" if value >= threshold else "fail"
 
 
-def lte(value: float | None, threshold: float) -> str:
+def lte(value, threshold):
     if value is None:
         return "unavailable"
     return "pass" if value <= threshold else "fail"
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def build_scan_pool() -> list[Instrument]:
-    """Full official universe, trimmed to a manageable live-polling pool.
-    See README for why we don't poll all ~2,300 NSE equities every 10s."""
+def build_scan_pool():
     universe = get_nse_equity_universe()
     return universe[:MAX_SCAN_UNIVERSE]
 
 
-def evaluate_symbol(inst: Instrument) -> dict:
+def evaluate_symbol(inst):
     quotes = get_live_quotes([inst]).get(inst.trading_symbol, {})
     ltp = quotes.get("ltp", 0.0)
     volume = quotes.get("volume", 0)
@@ -125,26 +121,20 @@ def evaluate_symbol(inst: Instrument) -> dict:
     rows = []
 
     v = fund["pe"]
-    rows.append(("Price-to-Earnings Ratio", lte(v, 25),
-                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+    rows.append(("Price-to-Earnings Ratio", lte(v, 25), (f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED")))
 
-    rows.append(("CMP Allocation Bounds", bounded(ltp, 50, 500),
-                  f"₹{ltp:.2f} (₹50 - ₹500)"))
+    rows.append(("CMP Allocation Bounds", bounded(ltp, 50, 500), f"Rs {ltp:.2f} (Rs 50 - Rs 500)"))
 
     v = fund["beta"]
-    rows.append(("Volatility Shield / Beta", bounded(v, 0.60, 1.20),
-                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+    rows.append(("Volatility Shield / Beta", bounded(v, 0.60, 1.20), (f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED")))
 
     v = fund["market_cap_cr"]
-    rows.append(("Free-Float Market Cap", gte(v, 5000),
-                  f"₹{v:,.0f} Cr" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+    rows.append(("Free-Float Market Cap", gte(v, 5000), (f"Rs {v:,.0f} Cr" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED")))
 
-    rows.append(("Volume Liquidity Depth Floor", gte(volume, 500_000),
-                  f"{volume:,} (Min: 500,000)"))
+    rows.append(("Volume Liquidity Depth Floor", gte(volume, 500000), f"{volume:,} (Min: 500,000)"))
 
     v = fund["debt_to_equity"]
-    rows.append(("Debt-to-Equity", "unavailable" if v is None else "pass",
-                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+    rows.append(("Debt-to-Equity", ("unavailable" if v is None else "pass"), (f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED")))
 
     verdict, detail = vwap_check(candles, ltp)
     rows.append(("VWAP Support Anchoring", verdict, detail))
@@ -161,19 +151,9 @@ def evaluate_symbol(inst: Instrument) -> dict:
     verdict, detail = momentum_check(candles)
     rows.append(("Intraday Momentum Acceleration", verdict, detail))
 
-    # Technical score = how many of the 5 real intraday signals (VWAP, EMA
-    # cross, Supertrend, volume surge, momentum) are currently PASS. This is
-    # what decides the winner now, not the fundamentals rows above — see
-    # the "safety_pass" gate below for why fundamentals still matter, just
-    # differently.
-    technical_rows = rows[6:]  # VWAP, EMA, Supertrend, vol surge, momentum
-    technical_score = sum(1 for _, v, _ in technical_rows if v == "pass")
+    technical_rows = rows[6:]
+    technical_score = sum(1 for row in technical_rows if row[1] == "pass")
 
-    # Safety gate: must trade in our budget range, and — only if the data is
-    # actually available — must clear the market-cap floor. Missing
-    # fundamental data does NOT disqualify a stock (Yahoo's free fundamentals
-    # are unreliable for some names), it just means that particular check is
-    # skipped rather than treated as a fail.
     cmp_ok = bounded(ltp, 50, 500) == "pass"
     mcap_verdict = gte(fund["market_cap_cr"], 5000)
     mcap_ok = mcap_verdict in ("pass", "unavailable")
@@ -191,47 +171,46 @@ def evaluate_symbol(inst: Instrument) -> dict:
     }
 
 
-def pick_winner(pool: list[Instrument]) -> dict:
-    """Winner = highest intraday technical score (VWAP/EMA/Supertrend/volume
-    surge/momentum alignment) among stocks that clear the basic safety gate
-    (tradeable price range + market cap floor, when available). Ties broken
-    by higher traded volume. This replaces the old 'highest volume wins'
-    logic with something that actually reflects intraday setup strength."""
+def pick_winner(pool):
     evaluations = [evaluate_symbol(inst) for inst in pool]
-    candidates = [e for e in evaluations if e["safety_pass"]] or evaluations
+    candidates = [e for e in evaluations if e["safety_pass"]]
+    if not candidates:
+        candidates = evaluations
     return max(candidates, key=lambda e: (e["technical_score"], e["volume"]))
 
 
-# ---------------------------------------------------------------- header ---
 left, right = st.columns([3, 1])
 with left:
-    st.markdown("### ⚡ QUANTBREAKOUT")
-    st.caption("Real-Time NSE Scanner — Powered by Kotak Neo")
+    st.markdown("### QUANTBREAKOUT")
+    st.caption("Real-Time NSE Scanner")
 with right:
-    if st.button("🔄 REFRESH NOW", use_container_width=True):
+    if st.button("REFRESH NOW", use_container_width=True):
         st.cache_data.clear()
 
 is_open = market_is_open()
 status_cols = st.columns(4)
-status_cols[0].metric("MARKET STATUS", "🟢 LIVE" if is_open else "🔴 CLOSED")
+status_cols[0].metric("MARKET STATUS", "LIVE" if is_open else "CLOSED")
 status_cols[1].metric("LAST UPDATED", dt.datetime.now(IST).strftime("%H:%M:%S"))
 status_cols[2].metric("SCAN POOL", f"{MAX_SCAN_UNIVERSE} EQUITIES")
 status_cols[3].metric("SERVER TIME (IST)", dt.datetime.now(IST).strftime("%H:%M:%S"))
 
 if not is_open:
-    st.info("Market is closed — showing the last fetched values from the most recent session, not live polling.")
+    st.info("Market is closed - showing the last fetched values, not live polling.")
 
 try:
     pool = build_scan_pool()
 except Exception as e:
-    st.error(f"Could not load the NSE universe from Kotak Neo: {e}")
+    st.error(f"Could not load the NSE universe: {e}")
     st.stop()
 
-# ---------------------------------------------------------- current pick ---
 if st.session_state.manual_symbol:
-    inst = next((i for i in pool if i.trading_symbol == st.session_state.manual_symbol), None)
+    inst = None
+    for i in pool:
+        if i.trading_symbol == st.session_state.manual_symbol:
+            inst = i
+            break
     if inst is None:
-        st.warning(f"'{st.session_state.manual_symbol}' not found in the scan pool — showing auto winner instead.")
+        st.warning(f"'{st.session_state.manual_symbol}' not found in the scan pool - showing auto winner instead.")
         st.session_state.manual_symbol = None
 
 if st.session_state.manual_symbol:
@@ -242,25 +221,22 @@ elif is_open or st.session_state.last_snapshot is None:
 else:
     snapshot = st.session_state.last_snapshot
 
-# ---------------------------------------------------------------- banner ---
-pass_count = sum(1 for _, v, _ in snapshot["rows"] if v == "pass")
-fail_count = sum(1 for _, v, _ in snapshot["rows"] if v == "fail")
-unavail_count = sum(1 for _, v, _ in snapshot["rows"] if v == "unavailable")
+pass_count = sum(1 for row in snapshot["rows"] if row[1] == "pass")
+fail_count = sum(1 for row in snapshot["rows"] if row[1] == "fail")
+unavail_count = sum(1 for row in snapshot["rows"] if row[1] == "unavailable")
 score = round(100 * pass_count / len(snapshot["rows"]), 1)
 
-st.markdown(
-    f"""
-    <div class="qb-gold-banner">
-        <span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">⭐ REAL-TIME QUANT BREAKOUT WINNER</span>
-        <h1 style="margin:8px 0 0 0;">{snapshot['symbol']}</h1>
-        <h2 style="color:#15803d;margin:4px 0;">₹{snapshot['ltp']:,.2f}</h2>
-        <p>Change: {snapshot['change']:+.2f} ({snapshot['change_pct']:+.2f}%) &nbsp;|&nbsp; Volume: {snapshot['volume']:,} &nbsp;|&nbsp; Score: {score}%</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
+banner_html = (
+    '<div class="qb-gold-banner">'
+    '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">REAL-TIME QUANT BREAKOUT WINNER</span>'
+    '<h1 style="margin:8px 0 0 0;">' + snapshot["symbol"] + '</h1>'
+    '<h2 style="color:#15803d;margin:4px 0;">Rs ' + format(snapshot["ltp"], ",.2f") + '</h2>'
+    '<p>Change: ' + format(snapshot["change"], "+.2f") + ' (' + format(snapshot["change_pct"], "+.2f") + '%) | '
+    'Volume: ' + format(snapshot["volume"], ",") + ' | Score: ' + str(score) + '%</p>'
+    '</div>'
 )
+st.markdown(banner_html, unsafe_allow_html=True)
 
-# ---------------------------------------------------------- nav + override -
 nav1, nav2 = st.columns(2)
 current_symbols = [i.trading_symbol for i in pool]
 try:
@@ -268,38 +244,65 @@ try:
 except ValueError:
     idx = 0
 
-if nav1.button("❬ PREVIOUS ASSET", use_container_width=True):
+if nav1.button("PREVIOUS ASSET", use_container_width=True):
     st.session_state.manual_symbol = current_symbols[(idx - 1) % len(current_symbols)]
     st.rerun()
-if nav2.button("NEXT ASSET ❭", use_container_width=True):
+if nav2.button("NEXT ASSET", use_container_width=True):
     st.session_state.manual_symbol = current_symbols[(idx + 1) % len(current_symbols)]
     st.rerun()
 
-manual_input = st.text_input("🔍 MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SBIN, INFY, ICICIBANK")
+manual_input = st.text_input("MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SBIN, INFY, ICICIBANK")
 if manual_input:
     st.session_state.manual_symbol = manual_input.strip().upper()
     st.rerun()
 
-# ---------------------------------------------------------------- matrix ---
 col_matrix, col_summary = st.columns([3, 1])
 
 with col_matrix:
-    st.markdown("#### 📋 11-Parameter Strategy Matrix")
-    table_rows = "".join(
-        f"<tr><td>{i+1}</td><td>{name}</td><td>{badge(verdict)}</td><td>{detail}</td></tr>"
-        for i, (name, verdict, detail) in enumerate(snapshot["rows"])
+    st.markdown("#### 11-Parameter Strategy Matrix")
+    table_rows = ""
+    i = 0
+    for name, verdict, detail in snapshot["rows"]:
+        i = i + 1
+        table_rows = table_rows + "<tr><td>" + str(i) + "</td><td>" + name + "</td><td>" + badge(verdict) + "</td><td>" + detail + "</td></tr>"
+    table_html = (
+        '<table class="qb-text" style="width:100%; border-collapse:collapse;">'
+        '<thead><tr><th>#</th><th>Parameter</th><th>Verdict</th><th>Live Metric Value</th></tr></thead>'
+        '<tbody>' + table_rows + '</tbody>'
+        '</table>'
     )
-    st.markdown(
-        f"""
-        <table class="qb-text" style="width:100%; border-collapse:collapse;">
-        <thead><tr><th>#</th><th>Parameter</th><th>Verdict</th><th>Live Metric Value</th></tr></thead>
-        <tbody>{table_rows}</tbody>
-        </table>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(table_html, unsafe_allow_html=True)
 
 with col_summary:
     st.markdown('<div class="qb-panel">', unsafe_allow_html=True)
-    st.markdown("**📊 Live Summary**")
-    st.metric("Pass Conditions",
+    st.markdown("**Live Summary**")
+    st.metric("Pass Conditions", f"{pass_count} / 11")
+    st.metric("Fail Conditions", f"{fail_count} / 11")
+    st.metric("Data Unavailable", f"{unavail_count} / 11")
+    st.metric("Matrix Score", f"{score}%")
+    st.metric("Intraday Technical Score", f"{snapshot['technical_score']} / 5")
+    st.caption("This technical score - not the overall matrix score - is what decides the winner.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("#### Position Sizing (Rs 15,000 Capital)")
+price = snapshot["ltp"] or 0.01
+shares = int(round(CAPITAL / price))
+risk_unit = price * 0.008
+sl = price - (risk_unit * 1.5)
+tp = price + (risk_unit * 3.0)
+
+size_cols = st.columns(4)
+size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
+size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
+size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
+size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
+
+risk_pct = risk_unit / price * 100
+st.caption(
+    "Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") + "%) | SL: 1.5x Risk | TP: 3.0x Risk. "
+    "This is a fixed mechanical calculation, not investment advice."
+)
+
+if is_open and not st.session_state.manual_symbol:
+    time.sleep(10)
+    st.rerun()
