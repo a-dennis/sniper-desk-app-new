@@ -1,260 +1,312 @@
-import io
-import time
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-import numpy as np
-import pandas as pd
-import requests
-import streamlit as st
-import yfinance as yf
+"""
+QuantBreakout Scanner Terminal
+-------------------------------
+Streamlit app implementing MASTER_PRODUCTION_ARCHITECTURE.txt against a
+Kotak Neo live data feed (prices/volume/candles) + yfinance (fundamentals).
 
-# Force premium full-width institutional workspace layout configuration
-st.set_page_config(
-    page_title="QUANTbreakout | Real-Time NSE Scanner",
-    page_icon="⚡",
-    layout="wide",
-    initial_sidebar_state="collapsed",
+Run locally:
+    streamlit run app.py
+
+Deploy: push this folder to your GitHub repo, then point Streamlit
+Community Cloud at it. See README.md for the secrets you need to configure.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import time
+
+import streamlit as st
+
+from kotak_client import (
+    IST,
+    Instrument,
+    get_intraday_candles,
+    get_live_quotes,
+    get_nse_equity_universe,
+    market_is_open,
+)
+from fundamentals import get_fundamentals
+from indicators import (
+    ema_cross_check,
+    momentum_check,
+    supertrend_check,
+    volume_surge_check,
+    vwap_check,
 )
 
-IST = ZoneInfo("Asia/Kolkata")
+CAPITAL = 15_000
+MAX_SCAN_UNIVERSE = 250  # see README "Tuning the scan pool" before raising this
 
-# Strategy constants mapped directly from your master rule book.
-PRICE_MIN = 50.0
-PRICE_MAX = 500.0
-BETA_MIN = 0.60
-BETA_MAX = 1.20
-FFMC_MIN_CR = 5000.0
-VOLUME_MIN = 500_000
-PE_MAX = 25.0
-CASH_BALANCE = 15_000.0
-REFRESH_MS = 5000
+st.set_page_config(page_title="QuantBreakout Scanner", layout="wide", page_icon="⚡")
 
-# ============================================================
-# 🎨 CUSTOM STYLESHEET RESYNC (LIGHT BLUE WORKSPACE & MOBILE SCRIPT)
-# ============================================================
+# ---------------------------------------------------------------- styling --
 st.markdown(
     """
-<style>
-:root {
-    --bg: #e0f2fe;
-    --panel: #bae6fd;
-    --border: #0284c7;
-    --ink: #0f172a;
-    --muted: #475569;
-    --green: #15803d;
-    --red: #b91c1c;
-    --gold-border: #ca8a04;
-}
-html, body, [class*="css"] {
-    font-family: Inter, system-ui, sans-serif;
-    background-color: var(--bg) !important;
-    color: var(--ink);
-}
-.stApp {
-    background-color: var(--bg) !important;
-}
-.block-container {
-    max-width: 1500px;
-    padding-top: 1rem;
-    padding-bottom: 2rem;
-}
-.topbar {
-    background: var(--panel);
-    border: 2px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 22px;
-    margin-bottom: 14px;
-}
-.brand {
-    font-size: 1.65rem;
-    font-weight: 950;
-    color: var(--ink);
-}
-.brand span { color: #0284c7; }
-.subbrand {
-    font-size: .78rem;
-    font-weight: 800;
-    color: var(--muted);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    margin-top: 3px;
-}
-.winner-gold-frame {
-    background: linear-gradient(135deg, #fef08a 0%, #fef9c3 100%);
-    border: 3px solid var(--gold-border);
-    border-radius: 6px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 4px 15px rgba(202, 138, 4, 0.15);
-    color: var(--ink) !important;
-    margin-bottom: 15px;
-}
-.winner-star-title {
-    font-size: 0.8rem; font-weight: 900; color: #854d0e; letter-spacing: 0.5px; text-transform: uppercase;
-}
-.blueprint-container {
-    background-color: var(--panel);
-    border: 2px solid var(--border);
-    padding: 18px;
-    border-radius: 6px;
-    margin-bottom: 15px;
-    color: var(--ink) !important;
-}
-.blueprint-title {
-    font-size: 0.78rem; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #0284c7; padding-bottom: 5px; margin-bottom: 8px;
-}
-.metric-card {
-    background: rgba(255,255,255,.90);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px;
-    min-height: 82px;
-}
-.metric-label {
-    font-size: .70rem;
-    color: var(--muted);
-    font-weight: 850;
-    text-transform: uppercase;
-}
-.metric-value {
-    font-size: 1.25rem;
-    color: var(--ink);
-    font-weight: 950;
-    margin-top: 3px;
-}
-div[data-testid="stDataFrame"] { width: 100%; }
-.stButton > button { width: 100%; min-height: 44px; font-weight: 900; border-radius: 10px; }
-
-/* 📱 ULTRADENSE MOBILE RESPONSIVE MEDIA BREAKPOINT SCRIPTS */
-@media (max-width: 768px) {
-    html, body, [class*="css"] { font-size: 13px !important; }
-    .winner-gold-frame { padding: 12px !important; margin-bottom: 10px !important; }
-    .blueprint-container { padding: 10px !important; margin-bottom: 10px !important; }
-    div[data-testid="stDataFrame"] { width: 100% !important; overflow-x: auto !important; }
-    div.stButton > button { padding: 8px !important; font-size: 0.75rem !important; }
-}
-</style>
-""",
+    <style>
+    .stApp { background-color: #e0f2fe; }
+    .qb-panel {
+        background-color: #bae6fd;
+        border: 1px solid #0284c7;
+        border-radius: 10px;
+        padding: 16px;
+    }
+    .qb-text { color: #0f172a; }
+    .qb-gold-banner {
+        width: 100%;
+        background: linear-gradient(180deg, #fef08a 0%, #fef9c3 100%);
+        border: 3px solid #ca8a04;
+        border-radius: 14px;
+        padding: 20px;
+        text-align: center;
+    }
+    .qb-badge-pass { color: #ffffff; background:#15803d; padding:3px 10px; border-radius:6px; font-weight:600; }
+    .qb-badge-fail { color: #ffffff; background:#b91c1c; padding:3px 10px; border-radius:6px; font-weight:600; }
+    .qb-badge-unavail { color: #0f172a; background:#cbd5e1; padding:3px 10px; border-radius:6px; font-weight:600; }
+    thead tr th { background-color: #ffffff !important; color:#0f172a !important; }
+    @media (max-width: 768px) {
+        .qb-panel { padding: 10px; }
+        html, body, [class*="css"] { font-size: 13px; }
+        .stDataFrame { overflow-x: auto; }
+    }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
-st.write("<h1 style='color:#0369a1; font-weight:900; margin-bottom: 20px;'>📊 STOCKSCAN GLOBAL</h1>", unsafe_allow_html=True)
+# ---------------------------------------------------------------- state ----
+if "pointer" not in st.session_state:
+    st.session_state.pointer = 0
+if "manual_symbol" not in st.session_state:
+    st.session_state.manual_symbol = None
+if "last_snapshot" not in st.session_state:
+    st.session_state.last_snapshot = None  # cached values for after-hours display
 
-# Persistent state indexing tracking pointers for the navigation carousel
-if "current_item_pointer" not in st.session_state:
-    st.session_state.current_item_pointer = 0
 
-# ==========================================
-# 📡 100% PURE REAL-TIME PIPELINE (ZERO HARDCODED STOCK CODES OR BACKUP ARRAYS)
-# ==========================================
-@st.cache_data(ttl=5)
-def scan_live_exchange_watchlist():
-    discovered_symbols = []
-    try:
-        # Algorithmic server-side query extracting whatever tickers are actively trending right now on Nifty boards
-        # This completely guarantees there isn't a single literal stock word hidden inside the file text code loops
-        search_query_engine = yf.Search(query="NSE", max_results=30)
-        for quote in search_query_engine.quotes:
-            symbol_string = quote.get('symbol', '').upper()
-            if '.NS' in symbol_string and not symbol_string.startswith('^'):
-                clean_sym = symbol_string.replace('.NS', '')
-                if clean_sym.isalpha() and len(clean_sym) <= 6 and "VIX" not in clean_sym:
-                    if clean_sym not in discovered_symbols:
-                        discovered_symbols.append(clean_sym)
-    except:
-        pass
-    return discovered_symbols
+def badge(verdict: str) -> str:
+    label = {"pass": "PASS", "fail": "FAIL", "unavailable": "DATA UNAVAILABLE"}[verdict]
+    cls = {"pass": "qb-badge-pass", "fail": "qb-badge-fail", "unavailable": "qb-badge-unavail"}[verdict]
+    return f'<span class="{cls}">{label}</span>'
 
-watchlist_pool = scan_live_exchange_watchlist()
 
-# ==========================================
-# 🏛️ SERVER RENDER CONTROLS
-# ==========================================
-if not watchlist_pool:
-    # 100% Name-Free loading status layout if data streams experience a temporary connection timeout
-    st.info("📡 [HARVESTING LIVE EXCHANGE DATA FROM NSE SERVERS... PLEASE REFRESH IN A FEW SECONDS]")
+def bounded(value: float | None, lo: float, hi: float) -> str:
+    if value is None:
+        return "unavailable"
+    return "pass" if lo <= value <= hi else "fail"
+
+
+def gte(value: float | None, threshold: float) -> str:
+    if value is None:
+        return "unavailable"
+    return "pass" if value >= threshold else "fail"
+
+
+def lte(value: float | None, threshold: float) -> str:
+    if value is None:
+        return "unavailable"
+    return "pass" if value <= threshold else "fail"
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def build_scan_pool() -> list[Instrument]:
+    """Full official universe, trimmed to a manageable live-polling pool.
+    See README for why we don't poll all ~2,300 NSE equities every 10s."""
+    universe = get_nse_equity_universe()
+    return universe[:MAX_SCAN_UNIVERSE]
+
+
+def evaluate_symbol(inst: Instrument) -> dict:
+    quotes = get_live_quotes([inst]).get(inst.trading_symbol, {})
+    ltp = quotes.get("ltp", 0.0)
+    volume = quotes.get("volume", 0)
+    candles = get_intraday_candles(inst.instrument_token)
+    fund = get_fundamentals(inst.trading_symbol)
+
+    rows = []
+
+    v = fund["pe"]
+    rows.append(("Price-to-Earnings Ratio", lte(v, 25),
+                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+
+    rows.append(("CMP Allocation Bounds", bounded(ltp, 50, 500),
+                  f"₹{ltp:.2f} (₹50 - ₹500)"))
+
+    v = fund["beta"]
+    rows.append(("Volatility Shield / Beta", bounded(v, 0.60, 1.20),
+                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+
+    v = fund["market_cap_cr"]
+    rows.append(("Free-Float Market Cap", gte(v, 5000),
+                  f"₹{v:,.0f} Cr" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+
+    rows.append(("Volume Liquidity Depth Floor", gte(volume, 500_000),
+                  f"{volume:,} (Min: 500,000)"))
+
+    v = fund["debt_to_equity"]
+    rows.append(("Debt-to-Equity", "unavailable" if v is None else "pass",
+                  f"{v:.2f}" if v is not None else "LIVE FUNDAMENTAL SOURCE REQUIRED"))
+
+    verdict, detail = vwap_check(candles, ltp)
+    rows.append(("VWAP Support Anchoring", verdict, detail))
+
+    verdict, detail = ema_cross_check(candles)
+    rows.append(("EMA 9 / 21 Cross", verdict, detail))
+
+    verdict, detail = supertrend_check(candles)
+    rows.append(("Supertrend Speed Engine", verdict, detail))
+
+    verdict, detail = volume_surge_check(candles)
+    rows.append(("Institutional Volume Mean Surge", verdict, detail))
+
+    verdict, detail = momentum_check(candles)
+    rows.append(("Intraday Momentum Acceleration", verdict, detail))
+
+    return {
+        "symbol": inst.trading_symbol,
+        "ltp": ltp,
+        "change": quotes.get("change", 0.0),
+        "change_pct": quotes.get("change_pct", 0.0),
+        "volume": volume,
+        "rows": rows,
+    }
+
+
+def pick_winner(pool: list[Instrument]) -> dict:
+    """Highest live traded volume among the scan pool = 'breakout winner'."""
+    quotes = get_live_quotes(pool)
+    if not quotes:
+        return evaluate_symbol(pool[0])
+    top_symbol = max(quotes, key=lambda s: quotes[s]["volume"])
+    top_inst = next(i for i in pool if i.trading_symbol == top_symbol)
+    return evaluate_symbol(top_inst)
+
+
+# ---------------------------------------------------------------- header ---
+left, right = st.columns([3, 1])
+with left:
+    st.markdown("### ⚡ QUANTBREAKOUT")
+    st.caption("Real-Time NSE Scanner — Powered by Kotak Neo")
+with right:
+    if st.button("🔄 REFRESH NOW", use_container_width=True):
+        st.cache_data.clear()
+
+is_open = market_is_open()
+status_cols = st.columns(4)
+status_cols[0].metric("MARKET STATUS", "🟢 LIVE" if is_open else "🔴 CLOSED")
+status_cols[1].metric("LAST UPDATED", dt.datetime.now(IST).strftime("%H:%M:%S"))
+status_cols[2].metric("SCAN POOL", f"{MAX_SCAN_UNIVERSE} EQUITIES")
+status_cols[3].metric("SERVER TIME (IST)", dt.datetime.now(IST).strftime("%H:%M:%S"))
+
+if not is_open:
+    st.info("Market is closed — showing the last fetched values from the most recent session, not live polling.")
+
+try:
+    pool = build_scan_pool()
+except Exception as e:
+    st.error(f"Could not load the NSE universe from Kotak Neo: {e}")
+    st.stop()
+
+# ---------------------------------------------------------- current pick ---
+if st.session_state.manual_symbol:
+    inst = next((i for i in pool if i.trading_symbol == st.session_state.manual_symbol), None)
+    if inst is None:
+        st.warning(f"'{st.session_state.manual_symbol}' not found in the scan pool — showing auto winner instead.")
+        st.session_state.manual_symbol = None
+
+if st.session_state.manual_symbol:
+    snapshot = evaluate_symbol(inst)
+elif is_open or st.session_state.last_snapshot is None:
+    snapshot = pick_winner(pool)
+    st.session_state.last_snapshot = snapshot
 else:
-    # Safeguard pointer index boundaries safely away from zero division errors
-    st.session_state.current_item_pointer = st.session_state.current_item_pointer % len(watchlist_pool)
-    auto_scanned_ticker = watchlist_pool[st.session_state.current_item_pointer].upper()
+    snapshot = st.session_state.last_snapshot
 
-    # ==========================================
-    # 🔍 INTERACTIVE MANUAL SC OVERRIDE DESK FIELD
-    # ==========================================
-    st.markdown("<div class='blueprint-container'><div class='blueprint-title'>🔍 MANUAL CHECK OVERRIDE FIELD</div>", unsafe_allow_html=True)
-    manual_input_raw = st.text_input("Type Stock Code Here:", placeholder="Type any NSE Stock Symbol Code (e.g., INFY, SBIN, TATASTEEL) and hit Enter key...", key="manual_override_search_field", label_visibility="collapsed")
-    cleaned_manual_query = manual_input_raw.upper().strip()
+# ---------------------------------------------------------------- banner ---
+pass_count = sum(1 for _, v, _ in snapshot["rows"] if v == "pass")
+fail_count = sum(1 for _, v, _ in snapshot["rows"] if v == "fail")
+unavail_count = sum(1 for _, v, _ in snapshot["rows"] if v == "unavailable")
+score = round(100 * pass_count / len(snapshot["rows"]), 1)
+
+st.markdown(
+    f"""
+    <div class="qb-gold-banner">
+        <span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">⭐ REAL-TIME QUANT BREAKOUT WINNER</span>
+        <h1 style="margin:8px 0 0 0;">{snapshot['symbol']}</h1>
+        <h2 style="color:#15803d;margin:4px 0;">₹{snapshot['ltp']:,.2f}</h2>
+        <p>Change: {snapshot['change']:+.2f} ({snapshot['change_pct']:+.2f}%) &nbsp;|&nbsp; Volume: {snapshot['volume']:,} &nbsp;|&nbsp; Score: {score}%</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------- nav + override -
+nav1, nav2 = st.columns(2)
+current_symbols = [i.trading_symbol for i in pool]
+try:
+    idx = current_symbols.index(snapshot["symbol"])
+except ValueError:
+    idx = 0
+
+if nav1.button("❬ PREVIOUS ASSET", use_container_width=True):
+    st.session_state.manual_symbol = current_symbols[(idx - 1) % len(current_symbols)]
+    st.rerun()
+if nav2.button("NEXT ASSET ❭", use_container_width=True):
+    st.session_state.manual_symbol = current_symbols[(idx + 1) % len(current_symbols)]
+    st.rerun()
+
+manual_input = st.text_input("🔍 MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SBIN, INFY, ICICIBANK")
+if manual_input:
+    st.session_state.manual_symbol = manual_input.strip().upper()
+    st.rerun()
+
+# ---------------------------------------------------------------- matrix ---
+col_matrix, col_summary = st.columns([3, 1])
+
+with col_matrix:
+    st.markdown("#### 📋 11-Parameter Strategy Matrix")
+    table_rows = "".join(
+        f"<tr><td>{i+1}</td><td>{name}</td><td>{badge(verdict)}</td><td>{detail}</td></tr>"
+        for i, (name, verdict, detail) in enumerate(snapshot["rows"])
+    )
+    st.markdown(
+        f"""
+        <table class="qb-text" style="width:100%; border-collapse:collapse;">
+        <thead><tr><th>#</th><th>Parameter</th><th>Verdict</th><th>Live Metric Value</th></tr></thead>
+        <tbody>{table_rows}</tbody>
+        </table>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col_summary:
+    st.markdown('<div class="qb-panel">', unsafe_allow_html=True)
+    st.markdown("**📊 Live Summary**")
+    st.metric("Pass Conditions", f"{pass_count} / 11")
+    st.metric("Fail Conditions", f"{fail_count} / 11")
+    st.metric("Data Unavailable", f"{unavail_count} / 11")
+    st.metric("Matrix Score", f"{score}%")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    target_ticker = cleaned_manual_query if cleaned_manual_query else auto_scanned_ticker
+# ---------------------------------------------------------- position sizer -
+st.markdown("#### 🧮 Position Sizing (₹15,000 Capital)")
+price = snapshot["ltp"] or 0.01
+shares = int(round(CAPITAL / price))
+risk_unit = price * 0.008
+sl = price - (risk_unit * 1.5)
+tp = price + (risk_unit * 3.0)
 
-    # ==========================================
-    # 📊 REAL-TIME VALUE RETRIEVAL ENGINE
-    # ==========================================
-    live_price = 0.00
-    volume = 0
-    pe_val = 0.00
-    beta_val = 1.00
-    mcap_val = 0.00
-    dynamic_vwap_line = 0.00
+size_cols = st.columns(4)
+size_cols[0].markdown(f'<div class="qb-panel">🛒 <b>Buy Exactly</b><br><span style="font-size:1.4em;">{shares} SHARES</span></div>', unsafe_allow_html=True)
+size_cols[1].markdown(f'<div class="qb-panel">🛡️ <b>Risk Unit</b><br><span style="font-size:1.4em;">₹{risk_unit:,.2f}</span></div>', unsafe_allow_html=True)
+size_cols[2].markdown(f'<div class="qb-panel">🔒 <b>Stop Loss</b><br><span style="font-size:1.4em;color:#b91c1c;">₹{sl:,.2f}</span></div>', unsafe_allow_html=True)
+size_cols[3].markdown(f'<div class="qb-panel">🎯 <b>Take Profit</b><br><span style="font-size:1.4em;color:#15803d;">₹{tp:,.2f}</span></div>', unsafe_allow_html=True)
 
-    try:
-        nse_key_string = target_ticker + ".NS"
-        india_data_pipe = yf.Ticker(nse_key_string)
-        
-        # Extract live historical candlestick streams directly from the exchange server pipes
-        live_df = india_data_pipe.history(period="1d", interval="1m")
-        if live_df.empty:
-            live_df = india_data_pipe.history(period="1d")
-            
-        if not live_df.empty:
-            live_price = float(live_df['Close'].iloc[-1])
-            volume = int(live_df['Volume'].iloc[-1])
-            
-            # Executing a true, professional intraday VWAP formula calculation natively from data arrays
-            typical_price = (live_df['High'] + live_df['Low'] + live_df['Close']) / 3
-            dynamic_vwap_line = float(typical_price.iloc[-1])
-            
-            pe_val = float(india_data_pipe.info.get('trailingPE', 0.00))
-            beta_val = float(india_data_pipe.info.get('beta', 1.00))
-            mcap_val = float(india_data_pipe.info.get('marketCap', 0.00) / 10000000)
-    except:
-        pass
+st.caption(
+    f"Risk per trade: ₹{risk_unit:,.2f} ({(risk_unit/price*100):.2f}%) | SL: 1.5x Risk | TP: 3.0x Risk. "
+    "This is a fixed mechanical calculation from the formulas you specified, not investment advice."
+)
 
-    if live_price == 0.00:
-        st.warning("⚠️ Prices are loading from the exchange socket. Click tap refresh to establish link channels.")
-    else:
-        # Strategy Threshold Checks Math Verification
-        check1 = "🟢 PASS" if (50 <= live_price <= 500) else "🔴 FAIL"
-        check2 = "🟢 PASS" if (pe_val <= 25 or pe_val == 0) else "🔴 FAIL"
-        check3 = "🟢 PASS" if (0.60 <= beta_val <= 1.20) else "🔴 FAIL"
-        check4 = "🟢 PASS" if (mcap_val >= 5000 or mcap_val == 0) else "🔴 FAIL"
-        check5 = "🟢 PASS" if (volume >= 500000 or volume == 0) else "🔴 FAIL"
-
-        # 1. PREMIUM STOCK OF THE DAY DISPLAY PANEL
-        st.markdown(f"""
-            <div class='winner-gold-frame'>
-                <div style='font-size: 0.85rem; font-weight: 900; color: #854d0e; letter-spacing: 0.5px;'>⭐ REAL-TIME QUANT BREAKOUT WINNER</div>
-                <div style='font-size:2.6rem; font-weight:900; color:#0f172a; margin: 2px 0;'>{target_ticker}</div>
-                <div id='winner-price-display' style='font-size:1.35rem; color:#15803d; font-weight:700;'>Live Price Checked: ₹{live_price:.2f}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Symmetric Carousel Navigation Controls directly below the gold container block
-        btn_space1, btn_space2 = st.columns(2)
-        with btn_space1:
-            if st.button(" ❬  PREVIOUS ASSET "):
-                st.session_state.current_item_pointer = (st.session_state.current_item_pointer - 1) % len(watchlist_pool)
-                st.rerun()
-        with btn_space2:
-            if st.button(" NEXT ASSET  ❭ "):
-                st.session_state.current_item_pointer = (st.session_state.current_item_pointer + 1) % len(watchlist_pool)
-                st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Pre-calculate string values safely outside the structural dataframe loops
-        str_pe = f"P/E: {pe_val:.2f}" if pe_val > 0 else "P/E: 18.50 (Live Match)"
-        str_price = f"₹{live_price:.2f}"
-        str_beta = f"Beta: {beta_val:.2f}"
-        str_mcap = f"₹{mcap_val:,.2f} Cr" if mcap_val > 0 else "Processing Balance Sheet..."
+# ---------------------------------------------------------- auto refresh --
+if is_open and not st.session_state.manual_symbol:
+    time.sleep(10)
+    st.rerun()
