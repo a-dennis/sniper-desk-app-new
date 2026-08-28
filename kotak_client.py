@@ -31,14 +31,13 @@ IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 # limited) endpoint will get the app throttled. Feel free to add/remove
 # symbols here (NSE trading symbol, no ".NS" suffix — that's added
 # automatically).
+# Trimmed to ~20 names on purpose: the app now scores EVERY stock in this
+# list each cycle (not just checking volume), so a smaller, genuinely liquid
+# set means fresher data per stock and fewer Yahoo rate-limit hiccups.
 NSE_LIQUID_UNIVERSE = [
     "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", "BHARTIARTL",
     "ITC", "LT", "KOTAKBANK", "AXISBANK", "BAJFINANCE", "MARUTI", "SUNPHARMA",
-    "TITAN", "ULTRACEMCO", "WIPRO", "TATAMOTORS", "TATASTEEL", "ADANIENT",
-    "HCLTECH", "ASIANPAINT", "NESTLEIND", "POWERGRID", "NTPC", "M&M",
-    "TECHM", "BAJAJFINSV", "COALINDIA", "SAIL", "BEL", "MOTHERSON",
-    "NATIONALUM", "INDUSINDBK", "ONGC", "GRASIM", "HINDALCO", "JSWSTEEL",
-    "DRREDDY", "CIPLA",
+    "TITAN", "TATAMOTORS", "TATASTEEL", "ADANIENT", "HCLTECH", "JSWSTEEL",
 ]
 
 
@@ -64,6 +63,30 @@ def get_nse_equity_universe() -> list[Instrument]:
     """Returns the curated liquid-stock list above. Cached for 12h (list
     barely changes)."""
     return [Instrument(trading_symbol=s) for s in NSE_LIQUID_UNIVERSE]
+
+
+INDEX_TICKERS = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_index_quotes() -> dict[str, dict]:
+    """Live (a few minutes' lag) NIFTY 50 / BANK NIFTY quotes. Returns
+    {"NIFTY 50": {"ltp":..., "change":..., "change_pct":...}, ...}."""
+    out = {}
+    for name, sym in INDEX_TICKERS.items():
+        try:
+            hist = yf.Ticker(sym).history(period="2d", interval="1d")
+            if hist.empty:
+                continue
+            last = hist.iloc[-1]
+            prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else last["Close"]
+            ltp = float(last["Close"])
+            change = ltp - float(prev_close)
+            change_pct = (change / prev_close * 100) if prev_close else 0.0
+            out[name] = {"ltp": ltp, "change": change, "change_pct": change_pct}
+        except Exception:
+            continue
+    return out
 
 
 @st.cache_data(ttl=20, show_spinner=False)
