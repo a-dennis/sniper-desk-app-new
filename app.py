@@ -293,4 +293,18 @@ risk_unit = price * 0.008
 sl = price - (risk_unit * 1.5)
 tp = price + (risk_unit * 3.0)
 
-size_cols =
+size_cols = st.columns(4)
+size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
+size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
+size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
+size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
+
+risk_pct = risk_unit / price * 100
+st.caption(
+    "Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") + "%) | SL: 1.5x Risk | TP: 3.0x Risk. "
+    "This is a fixed mechanical calculation, not investment advice."
+)
+
+if is_open and not st.session_state.manual_symbol:
+    time.sleep(10)
+    st.rerun()
