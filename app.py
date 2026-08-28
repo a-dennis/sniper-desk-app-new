@@ -1,14 +1,11 @@
 """
 QuantBreakout Scanner Terminal
 -------------------------------
-Streamlit app implementing MASTER_PRODUCTION_ARCHITECTURE.txt against a
-Kotak Neo live data feed (prices/volume/candles) + yfinance (fundamentals).
+Streamlit app implementing MASTER_PRODUCTION_ARCHITECTURE.txt against free
+Yahoo Finance data (prices/volume/candles/fundamentals).
 
 Run locally:
     streamlit run app.py
-
-Deploy: push this folder to your GitHub repo, then point Streamlit
-Community Cloud at it. See README.md for the secrets you need to configure.
 """
 
 from __future__ import annotations
@@ -16,11 +13,13 @@ from __future__ import annotations
 import datetime as dt
 import time
 
+import plotly.graph_objects as go
 import streamlit as st
 
 from kotak_client import (
     IST,
     Instrument,
+    get_index_quotes,
     get_intraday_candles,
     get_live_quotes,
     get_nse_equity_universe,
@@ -37,6 +36,7 @@ from indicators import (
 
 CAPITAL = 15_000
 MAX_SCAN_UNIVERSE = 250
+MIN_WINNING_SCORE = 4  # a stock must score at least this on the 5 technical signals to be crowned winner
 
 st.set_page_config(page_title="QuantBreakout Scanner", layout="wide", page_icon="lightning")
 
@@ -59,14 +59,25 @@ st.markdown(
         padding: 20px;
         text-align: center;
     }
+    .qb-weak-banner {
+        width: 100%;
+        background: #e2e8f0;
+        border: 3px solid #94a3b8;
+        border-radius: 14px;
+        padding: 20px;
+        text-align: center;
+    }
     .qb-badge-pass { color: #ffffff; background:#15803d; padding:3px 10px; border-radius:6px; font-weight:600; }
     .qb-badge-fail { color: #ffffff; background:#b91c1c; padding:3px 10px; border-radius:6px; font-weight:600; }
     .qb-badge-unavail { color: #0f172a; background:#cbd5e1; padding:3px 10px; border-radius:6px; font-weight:600; }
     thead tr th { background-color: #ffffff !important; color:#0f172a !important; }
+    .qb-index-strip { display:flex; gap:16px; margin-bottom:12px; }
+    .qb-index-card { background:#bae6fd; border:1px solid #0284c7; border-radius:8px; padding:8px 16px; flex:1; }
     @media (max-width: 768px) {
         .qb-panel { padding: 10px; }
         html, body, [class*="css"] { font-size: 13px; }
         .stDataFrame { overflow-x: auto; }
+        .qb-index-strip { flex-direction: column; }
     }
     </style>
     """,
@@ -79,6 +90,8 @@ if "manual_symbol" not in st.session_state:
     st.session_state.manual_symbol = None
 if "last_snapshot" not in st.session_state:
     st.session_state.last_snapshot = None
+if "last_alert_key" not in st.session_state:
+    st.session_state.last_alert_key = None
 
 
 def badge(verdict):
@@ -154,9 +167,6 @@ def evaluate_symbol(inst):
     technical_rows = rows[6:]
     technical_score = sum(1 for row in technical_rows if row[1] == "pass")
 
-    # Safety gate: only clear the market-cap floor when that data is
-    # actually available (missing data never disqualifies a stock). Price
-    # range is no longer a gate -- every stock in the pool is eligible.
     mcap_verdict = gte(fund["market_cap_cr"], 5000)
     mcap_ok = mcap_verdict in ("pass", "unavailable")
     safety_pass = mcap_ok
@@ -174,11 +184,17 @@ def evaluate_symbol(inst):
 
 
 def pick_winner(pool):
+    """Winner must score at least MIN_WINNING_SCORE on the 5 technical
+    signals. If nothing currently qualifies, we still return the best
+    available candidate but flag it as 'below_threshold' so the UI can be
+    honest about it instead of quietly crowning a weak/0-score stock."""
     evaluations = [evaluate_symbol(inst) for inst in pool]
     candidates = [e for e in evaluations if e["safety_pass"]]
     if not candidates:
         candidates = evaluations
-    return max(candidates, key=lambda e: (e["technical_score"], e["volume"]))
+    best = max(candidates, key=lambda e: (e["technical_score"], e["volume"]))
+    best["below_threshold"] = best["technical_score"] < MIN_WINNING_SCORE
+    return best
 
 
 left, right = st.columns([3, 1])
@@ -189,6 +205,22 @@ with right:
     if st.button("REFRESH NOW", use_container_width=True):
         st.cache_data.clear()
 
+# ---- NIFTY / BANK NIFTY index strip ----
+index_quotes = get_index_quotes()
+if index_quotes:
+    idx_html = '<div class="qb-index-strip">'
+    for name, q in index_quotes.items():
+        color = "#15803d" if q["change"] >= 0 else "#b91c1c"
+        sign = "+" if q["change"] >= 0 else ""
+        idx_html += (
+            '<div class="qb-index-card"><b>' + name + '</b><br>'
+            '<span style="font-size:1.3em;">' + format(q["ltp"], ",.2f") + '</span> '
+            '<span style="color:' + color + ';">' + sign + format(q["change"], ",.2f") +
+            ' (' + sign + format(q["change_pct"], ".2f") + '%)</span></div>'
+        )
+    idx_html += "</div>"
+    st.markdown(idx_html, unsafe_allow_html=True)
+
 is_open = market_is_open()
 status_cols = st.columns(4)
 status_cols[0].metric("MARKET STATUS", "LIVE" if is_open else "CLOSED")
@@ -197,7 +229,7 @@ status_cols[2].metric("SCAN POOL", f"{MAX_SCAN_UNIVERSE} EQUITIES")
 status_cols[3].metric("SERVER TIME (IST)", dt.datetime.now(IST).strftime("%H:%M:%S"))
 
 if not is_open:
-    st.info("Market is closed - showing the last fetched values, not live polling.")
+    st.info("Market is closed - showing the last traded values from the most recent session, not live polling.")
 
 try:
     pool = build_scan_pool()
@@ -217,27 +249,45 @@ if st.session_state.manual_symbol:
 
 if st.session_state.manual_symbol:
     snapshot = evaluate_symbol(inst)
+    snapshot["below_threshold"] = snapshot["technical_score"] < MIN_WINNING_SCORE
 elif is_open or st.session_state.last_snapshot is None:
     snapshot = pick_winner(pool)
     st.session_state.last_snapshot = snapshot
 else:
     snapshot = st.session_state.last_snapshot
 
+# ---- 5/5 pop-up alert (only for the auto-scanned winner, not manual lookups) ----
+if not st.session_state.manual_symbol and snapshot["technical_score"] == 5:
+    alert_key = snapshot["symbol"] + "_5of5"
+    if st.session_state.last_alert_key != alert_key:
+        st.toast(f"PERFECT SIGNAL: {snapshot['symbol']} just hit 5/5!", icon="🎯")
+        st.session_state.last_alert_key = alert_key
+elif not st.session_state.manual_symbol:
+    st.session_state.last_alert_key = None
+
 pass_count = sum(1 for row in snapshot["rows"] if row[1] == "pass")
 fail_count = sum(1 for row in snapshot["rows"] if row[1] == "fail")
 unavail_count = sum(1 for row in snapshot["rows"] if row[1] == "unavailable")
 score = round(100 * pass_count / len(snapshot["rows"]), 1)
 
+banner_class = "qb-weak-banner" if snapshot.get("below_threshold") else "qb-gold-banner"
+banner_label = (
+    "BEST AVAILABLE (below 4/5 threshold)" if snapshot.get("below_threshold")
+    else "REAL-TIME QUANT BREAKOUT WINNER"
+)
 banner_html = (
-    '<div class="qb-gold-banner">'
-    '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">REAL-TIME QUANT BREAKOUT WINNER</span>'
+    '<div class="' + banner_class + '">'
+    '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">' + banner_label + '</span>'
     '<h1 style="margin:8px 0 0 0;">' + snapshot["symbol"] + '</h1>'
     '<h2 style="color:#15803d;margin:4px 0;">Rs ' + format(snapshot["ltp"], ",.2f") + '</h2>'
     '<p>Change: ' + format(snapshot["change"], "+.2f") + ' (' + format(snapshot["change_pct"], "+.2f") + '%) | '
-    'Volume: ' + format(snapshot["volume"], ",") + ' | Score: ' + str(score) + '%</p>'
+    'Volume: ' + format(snapshot["volume"], ",") + ' | Technical Score: ' + str(snapshot["technical_score"]) + '/5</p>'
     '</div>'
 )
 st.markdown(banner_html, unsafe_allow_html=True)
+
+if snapshot.get("below_threshold") and not st.session_state.manual_symbol:
+    st.warning(f"No stock in the scan pool currently meets the {MIN_WINNING_SCORE}/5 minimum bar. Showing the closest match instead.")
 
 nav1, nav2 = st.columns(2)
 current_symbols = [i.trading_symbol for i in pool]
@@ -257,6 +307,28 @@ manual_input = st.text_input("MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SB
 if manual_input:
     st.session_state.manual_symbol = manual_input.strip().upper()
     st.rerun()
+
+# ---- Live candlestick chart with VWAP ----
+st.markdown("#### Live Intraday Chart - " + snapshot["symbol"])
+chart_candles = get_intraday_candles(snapshot["symbol"])
+if chart_candles is not None and not chart_candles.empty:
+    fig = go.Figure()
+    fig.add_trace(go.Candlestick(
+        x=chart_candles.index,
+        open=chart_candles["open"],
+        high=chart_candles["high"],
+        low=chart_candles["low"],
+        close=chart_candles["close"],
+        name=snapshot["symbol"],
+    ))
+    typical = (chart_candles["high"] + chart_candles["low"] + chart_candles["close"]) / 3
+    vwap_line = (typical * chart_candles["volume"]).cumsum() / chart_candles["volume"].cumsum().replace(0, 1)
+    fig.add_trace(go.Scatter(x=chart_candles.index, y=vwap_line, mode="lines", name="VWAP", line=dict(color="#0284c7", width=2)))
+    fig.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10), xaxis_rangeslider_visible=False,
+                       plot_bgcolor="#e0f2fe", paper_bgcolor="#e0f2fe")
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("Not enough intraday candle data to draw a chart for this stock right now.")
 
 col_matrix, col_summary = st.columns([3, 1])
 
@@ -283,7 +355,7 @@ with col_summary:
     st.metric("Data Unavailable", f"{unavail_count} / 11")
     st.metric("Matrix Score", f"{score}%")
     st.metric("Intraday Technical Score", f"{snapshot['technical_score']} / 5")
-    st.caption("This technical score - not the overall matrix score - is what decides the winner.")
+    st.caption("The Technical Score decides the winner (min " + str(MIN_WINNING_SCORE) + "/5 required).")
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("#### Position Sizing (Rs 15,000 Capital)")
