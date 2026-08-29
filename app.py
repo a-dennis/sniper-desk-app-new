@@ -258,11 +258,12 @@ score = round(100 * pass_count / len(snapshot["rows"]), 1)
 banner_class = "qb-weak-banner" if snapshot.get("below_threshold") else "qb-gold-banner"
 banner_label = ("BEST AVAILABLE (below 4/5 threshold)" if snapshot.get("below_threshold")
                 else "REAL-TIME QUANT BREAKOUT WINNER")
+display_ltp = snapshot["ltp"] if (snapshot["ltp"] and snapshot["ltp"] == snapshot["ltp"]) else 0.0
 banner_html = (
     '<div class="' + banner_class + '">'
     '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">' + banner_label + '</span>'
     '<h1 style="margin:8px 0 0 0;">' + snapshot["symbol"] + '</h1>'
-    '<h2 style="color:#15803d;margin:4px 0;">Rs ' + format(snapshot["ltp"], ",.2f") + '</h2>'
+    '<h2 style="color:#15803d;margin:4px 0;">Rs ' + format(display_ltp, ",.2f") + '</h2>'
     '<p>Change: ' + format(snapshot["change"], "+.2f") + ' (' + format(snapshot["change_pct"], "+.2f") + '%) | '
     'Volume: ' + format(snapshot["volume"], ",") + ' | Technical Score: ' + str(snapshot["technical_score"]) + '/5</p>'
     '</div>'
@@ -333,21 +334,27 @@ with col_summary:
 
 st.markdown("#### Position Sizing")
 capital = st.number_input("Your trading capital (Rs)", min_value=1000, step=1000, value=15000)
-price = snapshot["ltp"] or 0.01
-shares = int(round(capital / price))
-risk_unit = price * 0.008
-sl = price - (risk_unit * 1.5)
-tp = price + (risk_unit * 3.0)
+price = snapshot["ltp"]
+if not price or price != price or price <= 0:  # "price != price" catches NaN safely
+    price = None
 
-size_cols = st.columns(4)
-size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
-size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
-size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
-size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
+if price is None:
+    st.warning("Live price for this stock is temporarily unavailable (Yahoo returned no valid data just now). Position sizing will resume once a price comes through -- try Refresh Now.")
+else:
+    shares = int(round(capital / price))
+    risk_unit = price * 0.008
+    sl = price - (risk_unit * 1.5)
+    tp = price + (risk_unit * 3.0)
 
-risk_pct = risk_unit / price * 100
-st.caption("Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") +
-           "%) | SL: 1.5x Risk | TP: 3.0x Risk. Not investment advice.")
+    size_cols = st.columns(4)
+    size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
+    size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
+    size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
+    size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
+
+    risk_pct = risk_unit / price * 100
+    st.caption("Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") +
+               "%) | SL: 1.5x Risk | TP: 3.0x Risk. Not investment advice.")
 
 st.divider()
 render_portfolio_section(get_live_quotes, Instrument)
