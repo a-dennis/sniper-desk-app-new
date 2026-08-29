@@ -8,12 +8,12 @@ Two-tier scanning:
   Tier 1: every 15 min, lightweight volume scan across the FULL official
           NSE equity universe (~2,000 stocks) to find the ~50 most active
           names right now.
-  Tier 2: every 10 sec, full 5-signal technical analysis on that ~50-stock
-          shortlist (this is what decides the winner).
+  Tier 2: full 5-signal technical analysis on that ~50-stock shortlist --
+          refreshed every 10 sec while the market is open.
 
 Run locally:
     streamlit run app.py
-"""
+"""a
 
 from __future__ import annotations
 
@@ -53,41 +53,50 @@ st.set_page_config(page_title="QuantBreakout Scanner", layout="wide", page_icon=
 st.markdown(
     """
     <style>
-    .stApp { background-color: #e0f2fe; }
+    .stApp { background-color: #eff6ff; }
     .qb-panel {
-        background-color: #bae6fd;
-        border: 1px solid #0284c7;
-        border-radius: 10px;
+        background-color: #ffffff;
+        border: 1px solid #bae6fd;
+        border-radius: 12px;
         padding: 16px;
+        box-shadow: 0 1px 3px rgba(2,132,199,0.08);
     }
     .qb-text { color: #0f172a; }
     .qb-gold-banner {
         width: 100%;
-        background: linear-gradient(180deg, #fef08a 0%, #fef9c3 100%);
-        border: 3px solid #ca8a04;
-        border-radius: 14px;
-        padding: 20px;
+        background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%);
+        border: 2px solid #ca8a04;
+        border-radius: 16px;
+        padding: 24px;
         text-align: center;
+        box-shadow: 0 4px 12px rgba(202,138,4,0.18);
     }
     .qb-weak-banner {
         width: 100%;
-        background: #e2e8f0;
-        border: 3px solid #94a3b8;
-        border-radius: 14px;
-        padding: 20px;
+        background: #f1f5f9;
+        border: 2px solid #94a3b8;
+        border-radius: 16px;
+        padding: 24px;
         text-align: center;
     }
     .qb-badge-pass { color: #ffffff; background:#15803d; padding:3px 10px; border-radius:6px; font-weight:600; }
     .qb-badge-fail { color: #ffffff; background:#b91c1c; padding:3px 10px; border-radius:6px; font-weight:600; }
     .qb-badge-unavail { color: #0f172a; background:#cbd5e1; padding:3px 10px; border-radius:6px; font-weight:600; }
-    thead tr th { background-color: #ffffff !important; color:#0f172a !important; }
-    .qb-index-strip { display:flex; gap:16px; margin-bottom:12px; }
-    .qb-index-card { background:#bae6fd; border:1px solid #0284c7; border-radius:8px; padding:8px 16px; flex:1; }
+    thead tr th { background-color: #0284c7 !important; color:#ffffff !important; padding:8px !important; }
+    tbody tr td { padding:6px 8px !important; border-bottom:1px solid #e0f2fe; }
+    .qb-stat-strip { display:flex; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+    .qb-stat-card {
+        background:#ffffff; border:1px solid #bae6fd; border-radius:12px;
+        padding:12px 18px; flex:1; min-width:150px;
+        box-shadow: 0 1px 3px rgba(2,132,199,0.08);
+    }
+    .qb-stat-label { font-size:0.75em; color:#64748b; font-weight:600; letter-spacing:0.03em; }
+    .qb-stat-value { font-size:1.4em; font-weight:700; color:#0f172a; }
     @media (max-width: 768px) {
         .qb-panel { padding: 10px; }
         html, body, [class*="css"] { font-size: 13px; }
         .stDataFrame { overflow-x: auto; }
-        .qb-index-strip { flex-direction: column; }
+        .qb-stat-strip { flex-direction: column; }
     }
     </style>
     """,
@@ -96,10 +105,13 @@ st.markdown(
 
 if "manual_symbol" not in st.session_state:
     st.session_state.manual_symbol = None
-if "last_snapshot" not in st.session_state:
-    st.session_state.last_snapshot = None
 if "last_alert_time" not in st.session_state:
     st.session_state.last_alert_time = {}
+
+
+def stat_card(label, value, color="#0f172a"):
+    return ('<div class="qb-stat-card"><div class="qb-stat-label">' + label + '</div>'
+            '<div class="qb-stat-value" style="color:' + color + ';">' + value + '</div></div>')
 
 
 def badge(verdict):
@@ -158,7 +170,6 @@ def evaluate_symbol(inst):
 
     technical_rows = rows[6:]
     technical_score = sum(1 for row in technical_rows if row[1] == "pass")
-
     mcap_verdict = gte(fund["market_cap_cr"], 5000)
     safety_pass = mcap_verdict in ("pass", "unavailable")
 
@@ -183,38 +194,30 @@ def pick_winner(evaluations):
     return best
 
 
+# ---------------------------------------------------------------- header ---
 left, right = st.columns([3, 1])
 with left:
-    st.markdown("### QUANTBREAKOUT")
-    st.caption(f"Real-Time NSE Scanner - full universe screened, top {SHORTLIST_SIZE} tracked live")
+    st.markdown("### ⚡ QUANTBREAKOUT")
+    st.caption(f"Real-Time NSE Scanner — full universe screened, top {SHORTLIST_SIZE} tracked live")
 with right:
-    if st.button("REFRESH NOW", use_container_width=True):
+    if st.button("🔄 REFRESH NOW", use_container_width=True):
         st.cache_data.clear()
 
 index_quotes = get_index_quotes()
-if index_quotes:
-    idx_html = '<div class="qb-index-strip">'
-    for name, q in index_quotes.items():
-        color = "#15803d" if q["change"] >= 0 else "#b91c1c"
-        sign = "+" if q["change"] >= 0 else ""
-        idx_html += (
-            '<div class="qb-index-card"><b>' + name + '</b><br>'
-            '<span style="font-size:1.3em;">' + format(q["ltp"], ",.2f") + '</span> '
-            '<span style="color:' + color + ';">' + sign + format(q["change"], ",.2f") +
-            ' (' + sign + format(q["change_pct"], ".2f") + '%)</span></div>'
-        )
-    idx_html += "</div>"
-    st.markdown(idx_html, unsafe_allow_html=True)
-
 is_open = market_is_open()
-status_cols = st.columns(4)
-status_cols[0].metric("MARKET STATUS", "LIVE" if is_open else "CLOSED")
-status_cols[1].metric("LAST UPDATED", dt.datetime.now(IST).strftime("%H:%M:%S"))
-status_cols[2].metric("SHORTLIST SIZE", f"{SHORTLIST_SIZE} (from full NSE universe)")
-status_cols[3].metric("SERVER TIME (IST)", dt.datetime.now(IST).strftime("%H:%M:%S"))
+
+strip_html = '<div class="qb-stat-strip">'
+for name, q in index_quotes.items():
+    color = "#15803d" if q["change"] >= 0 else "#b91c1c"
+    sign = "+" if q["change"] >= 0 else ""
+    strip_html += stat_card(name, format(q["ltp"], ",.2f") + " (" + sign + format(q["change_pct"], ".2f") + "%)", color)
+strip_html += stat_card("MARKET STATUS", "🟢 LIVE" if is_open else "🔴 CLOSED", "#15803d" if is_open else "#b91c1c")
+strip_html += stat_card("SERVER TIME (IST)", dt.datetime.now(IST).strftime("%H:%M:%S"))
+strip_html += "</div>"
+st.markdown(strip_html, unsafe_allow_html=True)
 
 if not is_open:
-    st.info("Market is closed - showing the last traded values from the most recent session.")
+    st.info("Market is closed — showing the last completed trading session's data.")
 
 try:
     full_universe = get_full_nse_universe()
@@ -224,24 +227,21 @@ except Exception as e:
     st.stop()
 
 st.caption(f"Tier 1 full-universe scan covered {len(full_universe)} NSE equities; "
-           f"Tier 2 is live-tracking the {len(shortlist)} most active right now.")
+           f"Tier 2 is tracking the {len(shortlist)} most active right now.")
 
+# ---------------------------------------------------------- snapshot -------
 if st.session_state.manual_symbol:
     inst = Instrument(trading_symbol=st.session_state.manual_symbol)
     snapshot = evaluate_symbol(inst)
     snapshot["below_threshold"] = snapshot["technical_score"] < MIN_WINNING_SCORE
     evaluations = None
-elif is_open or st.session_state.last_snapshot is None:
+else:
     evaluations = scan_shortlist(shortlist)
     snapshot = pick_winner(evaluations)
-    st.session_state.last_snapshot = snapshot
     if not snapshot["below_threshold"]:
         log_signal(snapshot["symbol"], snapshot["ltp"], snapshot["volume"],
                    snapshot["technical_score"],
                    round(100 * sum(1 for r in snapshot["rows"] if r[1] == "pass") / 11, 1), IST)
-else:
-    snapshot = st.session_state.last_snapshot
-    evaluations = None
 
 if not st.session_state.manual_symbol and snapshot["technical_score"] == 5:
     now = dt.datetime.now(IST)
@@ -255,14 +255,15 @@ fail_count = sum(1 for row in snapshot["rows"] if row[1] == "fail")
 unavail_count = sum(1 for row in snapshot["rows"] if row[1] == "unavailable")
 score = round(100 * pass_count / len(snapshot["rows"]), 1)
 
+# ---------------------------------------------------------------- banner ---
+display_ltp = snapshot["ltp"] if (snapshot["ltp"] and snapshot["ltp"] == snapshot["ltp"]) else 0.0
 banner_class = "qb-weak-banner" if snapshot.get("below_threshold") else "qb-gold-banner"
 banner_label = ("BEST AVAILABLE (below 4/5 threshold)" if snapshot.get("below_threshold")
-                else "REAL-TIME QUANT BREAKOUT WINNER")
-display_ltp = snapshot["ltp"] if (snapshot["ltp"] and snapshot["ltp"] == snapshot["ltp"]) else 0.0
+                else "⭐ REAL-TIME QUANT BREAKOUT WINNER")
 banner_html = (
     '<div class="' + banner_class + '">'
-    '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;">' + banner_label + '</span>'
-    '<h1 style="margin:8px 0 0 0;">' + snapshot["symbol"] + '</h1>'
+    '<span style="background:#ca8a04;color:white;padding:4px 14px;border-radius:16px;font-size:0.85em;">' + banner_label + '</span>'
+    '<h1 style="margin:10px 0 0 0;">' + snapshot["symbol"] + '</h1>'
     '<h2 style="color:#15803d;margin:4px 0;">Rs ' + format(display_ltp, ",.2f") + '</h2>'
     '<p>Change: ' + format(snapshot["change"], "+.2f") + ' (' + format(snapshot["change_pct"], "+.2f") + '%) | '
     'Volume: ' + format(snapshot["volume"], ",") + ' | Technical Score: ' + str(snapshot["technical_score"]) + '/5</p>'
@@ -273,27 +274,55 @@ st.markdown(banner_html, unsafe_allow_html=True)
 if snapshot.get("below_threshold") and not st.session_state.manual_symbol:
     st.warning(f"No stock in the shortlist currently meets the {MIN_WINNING_SCORE}/5 minimum bar. Showing the closest match.")
 
-manual_input = st.text_input("MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SBIN, INFY, ICICIBANK")
-if manual_input:
-    st.session_state.manual_symbol = manual_input.strip().upper()
+# ---------------------------------------------------------- nav + search ---
+shortlist_symbols = [i.trading_symbol for i in shortlist]
+nav1, nav2 = st.columns(2)
+try:
+    idx = shortlist_symbols.index(snapshot["symbol"])
+except ValueError:
+    idx = 0
+
+if nav1.button("❬ PREVIOUS ASSET", use_container_width=True, disabled=len(shortlist_symbols) < 2):
+    st.session_state.manual_symbol = shortlist_symbols[(idx - 1) % len(shortlist_symbols)]
     st.rerun()
-if st.session_state.manual_symbol and st.button("Back to auto-scan"):
-    st.session_state.manual_symbol = None
+if nav2.button("NEXT ASSET ❭", use_container_width=True, disabled=len(shortlist_symbols) < 2):
+    st.session_state.manual_symbol = shortlist_symbols[(idx + 1) % len(shortlist_symbols)]
     st.rerun()
 
+with st.form("manual_search_form", clear_on_submit=False):
+    sc1, sc2 = st.columns([4, 1])
+    manual_input = sc1.text_input("🔍 MANUAL CHECK OVERRIDE FIELD", placeholder="e.g. SBIN, INFY, ICICIBANK",
+                                   label_visibility="collapsed")
+    search_clicked = sc2.form_submit_button("🔍 Search", use_container_width=True)
+    if search_clicked and manual_input.strip():
+        st.session_state.manual_symbol = manual_input.strip().upper()
+        st.rerun()
+
+if st.session_state.manual_symbol:
+    if st.button("⬅ Back to auto-scan"):
+        st.session_state.manual_symbol = None
+        st.rerun()
+
+# ---------------------------------------------------------- ranked list ----
 if evaluations:
-    st.markdown("#### Top 5 Ranked Shortlist")
+    st.markdown("#### 🏆 Top 5 Ranked Shortlist — click a row for full details")
     top5 = evaluations[:5]
-    rank_html = ('<table class="qb-text" style="width:100%; border-collapse:collapse;">'
-                 '<thead><tr><th>Rank</th><th>Symbol</th><th>LTP</th><th>Technical Score</th><th>Volume</th></tr></thead><tbody>')
-    for rank, e in enumerate(top5, start=1):
-        rank_html += ("<tr><td>" + str(rank) + "</td><td>" + e["symbol"] + "</td><td>Rs " +
-                      format(e["ltp"], ",.2f") + "</td><td>" + str(e["technical_score"]) + "/5</td><td>" +
-                      format(e["volume"], ",") + "</td></tr>")
-    rank_html += "</tbody></table>"
-    st.markdown(rank_html, unsafe_allow_html=True)
+    cols = st.columns(5)
+    for col, e in zip(cols, top5):
+        with col:
+            score_color = "#15803d" if e["technical_score"] >= MIN_WINNING_SCORE else "#64748b"
+            st.markdown(
+                '<div class="qb-panel" style="text-align:center;">'
+                '<b>' + e["symbol"] + '</b><br>'
+                '<span style="color:#0f172a;">Rs ' + format(e["ltp"], ",.2f") + '</span><br>'
+                '<span style="color:' + score_color + ';font-weight:700;">' + str(e["technical_score"]) + '/5</span>'
+                '</div>', unsafe_allow_html=True)
+            if st.button("View", key="view_" + e["symbol"], use_container_width=True):
+                st.session_state.manual_symbol = e["symbol"]
+                st.rerun()
 
-st.markdown("#### Live Intraday Chart - " + snapshot["symbol"])
+# ---------------------------------------------------------- chart ----------
+st.markdown("#### 📈 Live Intraday Chart — " + snapshot["symbol"])
 chart_candles = get_intraday_candles(snapshot["symbol"])
 if chart_candles is not None and not chart_candles.empty:
     fig = go.Figure()
@@ -304,27 +333,29 @@ if chart_candles is not None and not chart_candles.empty:
     fig.add_trace(go.Scatter(x=chart_candles.index, y=vwap_line, mode="lines", name="VWAP",
                               line=dict(color="#0284c7", width=2)))
     fig.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10), xaxis_rangeslider_visible=False,
-                       plot_bgcolor="#e0f2fe", paper_bgcolor="#e0f2fe")
+                       plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+                       legend=dict(orientation="h", yanchor="bottom", y=1.02))
     st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("Not enough intraday candle data to draw a chart for this stock right now.")
+    st.info("No intraday candle data available for this stock right now (Yahoo may be temporarily rate-limiting or this symbol has thin data). Try Refresh Now, or pick another stock.")
 
+# ---------------------------------------------------------------- matrix ---
 col_matrix, col_summary = st.columns([3, 1])
 with col_matrix:
-    st.markdown("#### 11-Parameter Strategy Matrix")
+    st.markdown("#### 📋 11-Parameter Strategy Matrix")
     table_rows = ""
     i = 0
     for name, verdict, detail in snapshot["rows"]:
         i += 1
         table_rows += "<tr><td>" + str(i) + "</td><td>" + name + "</td><td>" + badge(verdict) + "</td><td>" + detail + "</td></tr>"
-    table_html = ('<table class="qb-text" style="width:100%; border-collapse:collapse;">'
+    table_html = ('<table class="qb-text" style="width:100%; border-collapse:collapse; background:#ffffff; border-radius:8px; overflow:hidden;">'
                   '<thead><tr><th>#</th><th>Parameter</th><th>Verdict</th><th>Live Metric Value</th></tr></thead>'
                   '<tbody>' + table_rows + '</tbody></table>')
     st.markdown(table_html, unsafe_allow_html=True)
 
 with col_summary:
     st.markdown('<div class="qb-panel">', unsafe_allow_html=True)
-    st.markdown("**Live Summary**")
+    st.markdown("**📊 Live Summary**")
     st.metric("Pass Conditions", f"{pass_count} / 11")
     st.metric("Fail Conditions", f"{fail_count} / 11")
     st.metric("Data Unavailable", f"{unavail_count} / 11")
@@ -332,14 +363,15 @@ with col_summary:
     st.metric("Intraday Technical Score", f"{snapshot['technical_score']} / 5")
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("#### Position Sizing")
+# ---------------------------------------------------------- position sizer -
+st.markdown("#### 🧮 Position Sizing")
 capital = st.number_input("Your trading capital (Rs)", min_value=1000, step=1000, value=15000)
 price = snapshot["ltp"]
-if not price or price != price or price <= 0:  # "price != price" catches NaN safely
+if not price or price != price or price <= 0:
     price = None
 
 if price is None:
-    st.warning("Live price for this stock is temporarily unavailable (Yahoo returned no valid data just now). Position sizing will resume once a price comes through -- try Refresh Now.")
+    st.warning("Live price for this stock is temporarily unavailable. Try Refresh Now.")
 else:
     shares = int(round(capital / price))
     risk_unit = price * 0.008
@@ -347,10 +379,10 @@ else:
     tp = price + (risk_unit * 3.0)
 
     size_cols = st.columns(4)
-    size_cols[0].markdown('<div class="qb-panel">Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
-    size_cols[1].markdown('<div class="qb-panel">Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
-    size_cols[2].markdown('<div class="qb-panel">Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
-    size_cols[3].markdown('<div class="qb-panel">Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
+    size_cols[0].markdown('<div class="qb-panel">🛒 Buy Exactly<br><span style="font-size:1.4em;">' + str(shares) + ' SHARES</span></div>', unsafe_allow_html=True)
+    size_cols[1].markdown('<div class="qb-panel">🛡️ Risk Unit<br><span style="font-size:1.4em;">Rs ' + format(risk_unit, ",.2f") + '</span></div>', unsafe_allow_html=True)
+    size_cols[2].markdown('<div class="qb-panel">🔒 Stop Loss<br><span style="font-size:1.4em;color:#b91c1c;">Rs ' + format(sl, ",.2f") + '</span></div>', unsafe_allow_html=True)
+    size_cols[3].markdown('<div class="qb-panel">🎯 Take Profit<br><span style="font-size:1.4em;color:#15803d;">Rs ' + format(tp, ",.2f") + '</span></div>', unsafe_allow_html=True)
 
     risk_pct = risk_unit / price * 100
     st.caption("Risk per trade: Rs " + format(risk_unit, ",.2f") + " (" + format(risk_pct, ".2f") +
