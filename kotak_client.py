@@ -167,7 +167,8 @@ def get_live_quotes(instruments: list[Instrument]) -> dict[str, dict]:
     out = {}
     for inst in instruments:
         try:
-            hist = yf.Ticker(f"{inst.trading_symbol}.NS").history(period="2d", interval="1d")
+            hist = yf.Ticker(f"{inst.trading_symbol}.NS").history(period="5d", interval="1d")
+            hist = hist.dropna(subset=["Close"])  # Yahoo sometimes appends an incomplete/NaN row
             if hist.empty:
                 continue
             last = hist.iloc[-1]
@@ -204,4 +205,4 @@ def get_intraday_candles(instrument_token: str, exchange_segment: str = "nse_cm"
     for col in expected:
         if col not in df.columns:
             df[col] = pd.NA
-    return df[expected].dropna(how="all")
+    return df[expected].dropna(subset=["open", "high", "low", "close"])
