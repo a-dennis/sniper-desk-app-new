@@ -190,12 +190,17 @@ def get_live_quotes(instruments: list[Instrument]) -> dict[str, dict]:
 @st.cache_data(ttl=30, show_spinner=False)
 def get_intraday_candles(instrument_token: str, exchange_segment: str = "nse_cm",
                           interval: str = "1m") -> pd.DataFrame:
-    """1-minute OHLCV candles for the current session, used for VWAP / EMA /
-    Supertrend / volume-surge / momentum. `instrument_token` here is just
-    the trading symbol (see Instrument dataclass above).
+    """1-minute OHLCV candles for the most recent trading session, used for
+    VWAP / EMA / Supertrend / volume-surge / momentum charts and checks.
+
+    Uses a 5-day lookback rather than "1d" because Yahoo's "1d" period is a
+    calendar day, not a trading day -- on a weekend or right after a
+    holiday, "1d" can return nothing at all. Pulling 5 days and keeping only
+    the most recent date that actually has data reliably gets you "the last
+    real trading session" regardless of what day it is right now.
     """
     try:
-        df = yf.Ticker(f"{instrument_token}.NS").history(period="1d", interval=interval)
+        df = yf.Ticker(f"{instrument_token}.NS").history(period="5d", interval=interval)
     except Exception:
         return pd.DataFrame()
     if df.empty:
@@ -205,4 +210,8 @@ def get_intraday_candles(instrument_token: str, exchange_segment: str = "nse_cm"
     for col in expected:
         if col not in df.columns:
             df[col] = pd.NA
-    return df[expected].dropna(subset=["open", "high", "low", "close"])
+    df = df[expected].dropna(subset=["open", "high", "low", "close"])
+    if df.empty:
+        return df
+    last_date = df.index.date.max()
+    return df[df.index.date == last_date]
