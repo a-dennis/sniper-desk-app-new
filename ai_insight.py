@@ -34,7 +34,7 @@ except ImportError:
 # Tried in order -- Google renames/retires model aliases periodically, so
 # we fall through to whichever is actually available for this API key
 # rather than hardcoding one name that might not exist yet.
-CANDIDATE_MODELS = ["gemini-3.6-flash", "gemini-2.0-flash-001", "gemini-2.0-flash"]
+CANDIDATE_MODELS = ["gemini-3.6-flash", "gemini-3.6-flash-001", "gemini-3.6-flash"]
 
 
 def _call_gemini(prompt: str) -> dict:
