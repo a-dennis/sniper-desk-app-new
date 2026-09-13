@@ -620,24 +620,62 @@ def suggest_strategy_type(bias, bullish_count, bearish_count, regime):
            "Signals are genuinely mixed. Forcing a trade here has no basis in the data we have."
 
 
+INDEX_OPTIONS_LIST = [
+    ("NIFTY 50", "^NSEI"),
+    ("BANK NIFTY", "^NSEBANK"),
+    ("SENSEX", "^BSESN"),
+    ("BANKEX", "BSE-BANK.BO"),
+]
+
+
+def evaluate_index_for_options(name, yahoo_ticker):
+    """Same 5 real technical checks used everywhere else in the app, run on
+    an INDEX instead of a stock. Indices don't have fundamentals/CMP/mcap
+    concerns, so this is a lighter, dedicated version rather than routing
+    through the full equity-oriented evaluate_symbol()."""
+    inst = Instrument(trading_symbol=name, yahoo_ticker=yahoo_ticker)
+    quotes = get_live_quotes([inst]).get(name, {})
+    ltp = quotes.get("ltp", 0.0)
+    change_pct = quotes.get("change_pct", 0.0)
+    candles = get_intraday_candles(yahoo_ticker)
+
+    rows = []
+    verdict, detail = vwap_check(candles, ltp)
+    rows.append(("VWAP Support Anchoring", verdict, detail))
+    verdict, detail = ema_cross_check(candles)
+    rows.append(("EMA 9 / 21 Cross", verdict, detail))
+    verdict, detail = supertrend_check(candles)
+    rows.append(("Supertrend Speed Engine", verdict, detail))
+    verdict, detail = volume_surge_check(candles)
+    rows.append(("Institutional Volume Mean Surge", verdict, detail))
+    verdict, detail = momentum_check(candles)
+    rows.append(("Intraday Momentum Acceleration", verdict, detail))
+
+    technical_score = sum(1 for _, v, _ in rows if v == "pass")
+    return {"symbol": name, "ltp": ltp, "change_pct": change_pct, "rows": rows, "technical_score": technical_score}
+
+
 def render_options_ideas_page(segment, evaluations):
     st.markdown("### 🎯 Options Strategy Ideas (Educational)")
-    st.warning("⚠️ This maps our REAL underlying-stock technical signals to a general strategy TYPE only. "
+    st.caption("Based on NIFTY 50, BANK NIFTY, SENSEX, and BANKEX -- the indices most retail options traders "
+               "actually trade, not individual stock options.")
+    st.warning("⚠️ This maps our REAL index technical signals to a general strategy TYPE only. "
                "It has no live option premium, strike, expiry, IV, or OI data -- you still need your broker's "
                "option chain to actually price and place any trade. Not a recommendation to buy or sell.")
-    if segment != "F&O Eligible Stocks":
-        st.info("Switch the Segment selector to 'F&O Eligible Stocks' to see strategy ideas for stocks that actually have option contracts.")
-        return
+
     regime = get_market_regime()["regime"]
-    st.caption(f"Current market regime: {regime}")
+    st.caption(f"Current market regime (based on NIFTY): {regime}")
 
     rows_html = ""
-    for e in evaluations[:15]:
+    for name, ticker in INDEX_OPTIONS_LIST:
+        e = evaluate_index_for_options(name, ticker)
         bias, bias_color, bull_n, bear_n = get_directional_bias(e["rows"])
         strategy, rationale = suggest_strategy_type(bias, bull_n, bear_n, regime)
         rows_html += (
             "<tr><td><b>" + e["symbol"] + "</b></td>"
-            "<td>Rs " + format(e["ltp"], ",.2f") + "</td>"
+            "<td>" + format(e["ltp"], ",.2f") + "</td>"
+            "<td style='color:" + ("#0a7d2e" if e["change_pct"] >= 0 else "#c81e1e") + ";'>"
+            + format(e["change_pct"], "+.2f") + "%</td>"
             "<td><span style='background:" + bias_color + ";color:#fff;padding:2px 10px;border-radius:4px;"
             "font-size:0.8em;font-weight:700;'>" + bias + "</span></td>"
             "<td><b>" + strategy + "</b></td>"
@@ -645,7 +683,7 @@ def render_options_ideas_page(segment, evaluations):
         )
     table_html = ('<table class="qb-text" style="width:100%; border-collapse:collapse; background:#ffffff; '
                   'border:1px solid #d1d5db; border-radius:8px;">'
-                  '<thead><tr><th>Stock</th><th>Price</th><th>Bias</th><th>Strategy Type</th><th>Why</th></tr></thead>'
+                  '<thead><tr><th>Index</th><th>Level</th><th>Change</th><th>Bias</th><th>Strategy Type</th><th>Why</th></tr></thead>'
                   '<tbody>' + rows_html + '</tbody></table>')
     st.markdown(table_html, unsafe_allow_html=True)
     st.caption("Once you decide on a strategy type here, open your broker's option chain to pick the actual strike/expiry and check the real premium before doing anything.")
